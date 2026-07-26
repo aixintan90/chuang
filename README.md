@@ -8,12 +8,12 @@
 Catches prompt injection, data exfiltration, hidden instructions and more —
 offline, bilingual (EN / 中文), in one command.*
 
-[![CI](https://github.com/aixintan90/chuang/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/chuang/actions/workflows/ci.yml)
-[![Pages](https://github.com/aixintan90/chuang/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/chuang/)
+[![CI](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml)
+[![Pages](https://github.com/aixintan90/skillxray/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/skillxray/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [**Live scanner ↗**](https://aixintan90.github.io/chuang/)
+[English](README.md) · [简体中文](README.zh-CN.md) · [**Live scanner ↗**](https://aixintan90.github.io/skillxray/)
 
 </div>
 
@@ -45,7 +45,7 @@ x-rayed 1 skill  ·  critical 1  high 4  medium 2
 ```
 
 **→ Try it in your browser, no install:
-[aixintan90.github.io/chuang](https://aixintan90.github.io/chuang/)** — paste a
+[aixintan90.github.io/skillxray](https://aixintan90.github.io/skillxray/)** — paste a
 `SKILL.md`, get an instant x-ray. Everything runs client-side; nothing is
 uploaded.
 
@@ -61,7 +61,7 @@ uploaded.
 | 🎭 | **Impersonation** | a skill named `docx` that isn't from `anthropics/skills` |
 | 🧬 | **Persistence** | writes to `~/.bashrc`, cron, scheduled tasks, registry run keys |
 
-Full rule list: `skillxray rules` (or [browse them on the site](https://aixintan90.github.io/chuang/)).
+Full rule list: `skillxray rules` (or [browse them on the site](https://aixintan90.github.io/skillxray/)).
 
 ## The hard part: not crying wolf
 
@@ -89,23 +89,23 @@ One file, standard library only, Python 3.9+.
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -o skillxray.py
+curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -o skillxray.py
 python3 skillxray.py scan anthropics/skills
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -OutFile skillxray.py
+irm https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -OutFile skillxray.py
 python skillxray.py scan anthropics/skills
 ```
 
 To put it on your `PATH` as `skillxray`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/install.sh | sh
 ```
 ```powershell
-irm https://raw.githubusercontent.com/aixintan90/chuang/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/aixintan90/skillxray/main/install.ps1 | iex
 ```
 
 <sub>Prefer to read before you run? Pipe the installer to `less` / `more` first —
@@ -131,7 +131,7 @@ Flags: `--lang en|zh|both` · `--json` · `--fail-on critical|high|medium|low` �
 
 ```yaml
 - run: |
-    curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -o skillxray.py
+    curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -o skillxray.py
     python3 skillxray.py scan .claude/skills --fail-on high
 ```
 

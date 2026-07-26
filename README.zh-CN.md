@@ -7,12 +7,12 @@
 *一个零依赖的 AI Agent 技能（`SKILL.md`）安全扫描器：
 检测提示注入、数据外传、隐形指令等风险 —— 离线、中英双语、一条命令搞定。*
 
-[![CI](https://github.com/aixintan90/chuang/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/chuang/actions/workflows/ci.yml)
-[![Pages](https://github.com/aixintan90/chuang/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/chuang/)
+[![CI](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml)
+[![Pages](https://github.com/aixintan90/skillxray/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/skillxray/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [**在线安检器 ↗**](https://aixintan90.github.io/chuang/)
+[English](README.md) · [简体中文](README.zh-CN.md) · [**在线安检器 ↗**](https://aixintan90.github.io/skillxray/)
 
 </div>
 
@@ -40,7 +40,7 @@ $ skillxray scan ./code-beautifier --lang zh
 ```
 
 **→ 免安装，浏览器里直接试：
-[aixintan90.github.io/chuang](https://aixintan90.github.io/chuang/)** ——
+[aixintan90.github.io/skillxray](https://aixintan90.github.io/skillxray/)** ——
 粘贴一个 `SKILL.md`，当场出安检报告。全部在浏览器本地运行，不上传任何内容。
 
 ## 它能查什么
@@ -55,7 +55,7 @@ $ skillxray scan ./code-beautifier --lang zh
 | 🎭 | **仿冒官方** | 一个叫 `docx` 但不来自 `anthropics/skills` 的技能 |
 | 🧬 | **植入持久化** | 写 `~/.bashrc`、cron、计划任务、注册表启动项 |
 
-完整规则：`skillxray rules`（或[在网站上浏览](https://aixintan90.github.io/chuang/)）。
+完整规则：`skillxray rules`（或[在网站上浏览](https://aixintan90.github.io/skillxray/)）。
 
 ## 最难的部分：不误报
 
@@ -80,23 +80,23 @@ $ skillxray scan anthropics/skills
 
 ```bash
 # macOS / Linux
-curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -o skillxray.py
+curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -o skillxray.py
 python3 skillxray.py scan anthropics/skills
 ```
 
 ```powershell
 # Windows (PowerShell)
-irm https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -OutFile skillxray.py
+irm https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -OutFile skillxray.py
 python skillxray.py scan anthropics/skills
 ```
 
 想放到 `PATH` 里当 `skillxray` 用：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/install.sh | sh
 ```
 ```powershell
-irm https://raw.githubusercontent.com/aixintan90/chuang/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/aixintan90/skillxray/main/install.ps1 | iex
 ```
 
 <sub>想先看再跑？把安装脚本先 `less` / `more` 一下——它只是下载一个文件、在你
@@ -122,7 +122,7 @@ skillxray rules                   # 列出所有检测规则
 
 ```yaml
 - run: |
-    curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py -o skillxray.py
+    curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/skillxray.py -o skillxray.py
     python3 skillxray.py scan .claude/skills --fail-on high
 ```
 

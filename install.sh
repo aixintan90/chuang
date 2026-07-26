@@ -1,10 +1,10 @@
 #!/bin/sh
 # skillxray installer — downloads one Python file and drops a launcher on PATH.
-# Usage:  curl -fsSL https://raw.githubusercontent.com/aixintan90/chuang/main/install.sh | sh
+# Usage:  curl -fsSL https://raw.githubusercontent.com/aixintan90/skillxray/main/install.sh | sh
 # Opt out of PATH edits with SKILLXRAY_NO_MODIFY_PATH=1. Override dir with SKILLXRAY_INSTALL_DIR.
 set -eu
 
-REPO="aixintan90/chuang"
+REPO="aixintan90/skillxray"
 SRC_URL="https://raw.githubusercontent.com/${REPO}/main/skillxray.py"
 
 say() { printf '%s\n' "$1" >&2; }

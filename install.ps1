@@ -1,9 +1,9 @@
 # skillxray installer for Windows (PowerShell 5.1+).
-# Usage:  irm https://raw.githubusercontent.com/aixintan90/chuang/main/install.ps1 | iex
+# Usage:  irm https://raw.githubusercontent.com/aixintan90/skillxray/main/install.ps1 | iex
 # Opt out of PATH edits with $env:SKILLXRAY_NO_MODIFY_PATH = "1".
 $ErrorActionPreference = "Stop"
 
-$Repo   = "aixintan90/chuang"
+$Repo   = "aixintan90/skillxray"
 $SrcUrl = "https://raw.githubusercontent.com/$Repo/main/skillxray.py"
 
 $py = (Get-Command python -ErrorAction SilentlyContinue)
