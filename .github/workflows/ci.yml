@@ -42,4 +42,6 @@ jobs:
         run: |
           python skillxray.py --version
           python skillxray.py rules --no-color | tail -n 3
-          python skillxray.py scan tests/fixtures --json > /dev/null
+          # Scan the clean fixture (exit 0) and confirm it emits valid JSON.
+          python skillxray.py scan tests/fixtures/clean-formatter --json > out.json
+          python -c "import json,sys; d=json.load(open('out.json')); sys.exit(0 if d and d[0]['grade']=='A' else 1)"
