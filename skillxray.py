@@ -32,7 +32,7 @@ import sys
 import tempfile
 import zipfile
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 SEV_SCORE = {"CRITICAL": 40, "HIGH": 20, "MEDIUM": 7, "LOW": 2, "INFO": 0}
