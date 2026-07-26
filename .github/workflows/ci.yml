@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Unit tests (engine, fixtures, CLI)
+        run: python tests/test_skillxray.py
+
+      - name: Web rules are in sync with the engine
+        run: python build_web.py --check
+
+      - name: Malicious fixtures must fail the scan (exit 1)
+        shell: bash
+        run: |
+          set +e
+          python skillxray.py scan tests/fixtures/evil-injection --no-color
+          code=$?
+          set -e
+          test "$code" = "1" || { echo "expected exit 1 on a malicious skill, got $code"; exit 1; }
+
+      - name: Clean fixture must pass even at --fail-on low (exit 0)
+        run: python skillxray.py scan tests/fixtures/clean-formatter --fail-on low --no-color
+
+      - name: Smoke — version, rules, json
+        shell: bash
+        run: |
+          python skillxray.py --version
+          python skillxray.py rules --no-color | tail -n 3
+          python skillxray.py scan tests/fixtures --json > /dev/null

