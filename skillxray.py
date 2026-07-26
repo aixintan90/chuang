@@ -123,17 +123,35 @@ COMMAND_LINE = re.compile(
     re.IGNORECASE)
 
 
+def in_code_context(text, start, end):
+    """True when the match sits inside a fenced block or inline backticks.
+
+    Quotes there are syntax — a JSON value like "bypassPermissions" or a shell
+    string is code being handed to the agent, not prose quoting an example.
+    """
+    before = text[:start]
+    if before.count("\n```") % 2 == 1 or before.startswith("```"):
+        return True
+    line_start = before.rfind("\n") + 1
+    line = text[line_start:text.find("\n", end) if text.find("\n", end) != -1
+                else len(text)]
+    rel = start - line_start
+    return line.count("`", 0, rel) % 2 == 1
+
+
 def is_mention(text, start, end):
     """Heuristic: is this match being quoted/discussed rather than ISSUED?
 
     Two independent signals, deliberately conservative because a false
     "it's only an example" is how an attacker would sneak a real payload past
     the scanner:
-      1. Framing words nearby (avoid, example, never, 比如 …) — strong.
+      1. Framing words nearby (avoid, example, never, 比如 …) — strong, and
+         applies everywhere.
       2. Real quotation marks around it IN PROSE — weak, and suppressed when
-         the line is itself a shell command (there, quotes are string syntax).
-    Markdown backticks are NOT treated as quotation: they format inline code,
-    including file paths inside genuine instructions like "read `~/.ssh/id_rsa`".
+         the match is inside code (a shell command, a fenced block, or inline
+         backticks), because quotes are string syntax there.
+    Markdown backticks are never treated as quotation themselves: they format
+    inline code, including paths in real instructions like "read `~/.ssh/id_rsa`".
     """
     physical_line = text[text.rfind("\n", 0, start) + 1:
                          text.find("\n", end) if text.find("\n", end) != -1
@@ -145,6 +163,8 @@ def is_mention(text, start, end):
     if MENTION_WORDS.search(lq + " " + rq):
         return True
     if COMMAND_LINE.search(physical_line):
+        return False
+    if in_code_context(text, start, end):
         return False
     for q in ('"', "'", "“", "「"):
         closer = {"“": "”", "「": "」"}.get(q, q)
@@ -274,6 +294,18 @@ RULES = [
          title_zh="技能注册了 hooks（在 Agent 事件上自动执行命令）",
          advice_en="Hooks run without per-use confirmation. Audit each hook command.",
          advice_zh="hooks 触发时不会逐次确认。逐条审计 hook 命令。"),
+    dict(id="SXR022", severity="HIGH", kind="builtin", check="image-exfil",
+         title_en="Markdown image/link that could carry stolen data off-site",
+         title_zh="Markdown 图片/链接可能把偷到的数据带出去",
+         advice_en="Renderers fetch images automatically — a URL query string is a silent outbound channel. Check what goes in it.",
+         advice_zh="渲染器会自动加载图片——URL 的查询串就是一条无声的外发通道。看清楚里面塞了什么。"),
+    dict(id="SXR023", severity="HIGH", kind="pattern", target="any_text",
+         pattern=r"mcpServers|\.mcp\.json|claude\s+mcp\s+add|(register|install|add)[^\n]{0,40}MCP\s+server",
+         flags="i",
+         title_en="Registers an MCP server (grants the agent a new tool backend)",
+         title_zh="注册 MCP 服务器（等于给 Agent 接上一个新的工具后端）",
+         advice_en="An MCP server is code that runs and receives your agent's data. Verify the command and its source before allowing it.",
+         advice_zh="MCP 服务器是会运行、并能收到你 Agent 数据的代码。允许之前先核实它的启动命令和来源。"),
     dict(id="SXR021", severity="HIGH", kind="pattern", target="any_text",
          pattern=r"pip\s+install\s+[^\n]*(https?://|git\+)|npm\s+install\s+[^\n]*(https?://|git(\+|:))|go\s+install\s+\S+@(?!latest)|gem\s+install\s+[^\n]*--source",
          flags="i",
@@ -685,6 +717,32 @@ def run_builtin_rule(rule, skill, all_findings):
         for d, (where, ln, sev) in sorted(domains.items())[:5]:
             out.append(finding(rule, where, ln, d, sev))
 
+    elif check == "image-exfil":
+        # A markdown image is fetched by the renderer with no click and no
+        # confirmation. If its URL carries a query string, that query string
+        # is an outbound channel. Badge/shield services do this legitimately,
+        # so they are excluded; everything else is worth a human look.
+        badge_hosts = ("shields.io", "img.shields.io", "badgen.net",
+                       "badge.fury.io", "codecov.io", "circleci.com",
+                       "travis-ci.org", "travis-ci.com", "appveyor.com",
+                       "coveralls.io", "snyk.io", "githubusercontent.com",
+                       "github.com", "gitlab.com")
+        img = re.compile(r"!\[[^\]]*\]\(\s*(https?://([A-Za-z0-9.-]+)[^)\s]*)")
+        for where, text in skill.target_text("any_text"):
+            if rule["id"] in skill.ignored.get(where, ()):
+                continue
+            for m in img.finditer(text):
+                url, host = m.group(1), m.group(2).lower()
+                if "?" not in url:
+                    continue
+                if any(host == b or host.endswith("." + b) for b in badge_hosts):
+                    continue
+                sev = (demote(rule["severity"]) if skill.is_reference(where)
+                       else rule["severity"])
+                out.append(finding(rule, where, line_of(text, m.start()),
+                                   url[:90], sev))
+                break
+
     elif check == "binaries-bundled":
         bins = [f for f in skill.files if f.lower().endswith(BINARY_EXT)]
         if bins:
@@ -1005,7 +1063,7 @@ def summarize(results, pal, lang):
                    "  ·  " + pal.green("all clear" if lang != "zh" else "全部干净"))
 
 
-def cmd_scan(args, pal, lang, as_json, fail_on, verbose):
+def cmd_scan(args, pal, lang, as_json, fail_on, verbose, fmt="text", out=None):
     targets = []
     tmp = None
     source = None
@@ -1043,24 +1101,167 @@ def cmd_scan(args, pal, lang, as_json, fail_on, verbose):
             return 2
 
     results = [scan_skill(t, source=source) for t in targets]
+
     if as_json:
+        fmt = "json"
+    rendered = None
+    if fmt == "json":
         payload = []
         for skill, findings, score, grade in results:
             payload.append({"name": skill.name, "path": skill.path,
                             "score": score, "grade": grade,
                             "findings": findings})
-        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        rendered = json.dumps(payload, ensure_ascii=False, indent=2)
+    elif fmt == "sarif":
+        rendered = json.dumps(sarif_report(results), ensure_ascii=False, indent=2)
+    elif fmt == "markdown":
+        rendered = markdown_report(results, lang)
+
+    if rendered is not None:
+        if out:
+            with io.open(out, "w", encoding="utf-8", newline="\n") as f:
+                f.write(rendered + "\n")
+            print(pal.dim("wrote %s report to %s" % (fmt, out)))
+        else:
+            print(rendered)
     else:
         report, _ = render_report(results, pal, lang, verbose)
         print(report)
         print("")
         print(summarize(results, pal, lang))
+        if out:
+            with io.open(out, "w", encoding="utf-8", newline="\n") as f:
+                f.write(markdown_report(results, lang) + "\n")
     threshold = SEVERITIES.index(fail_on)
     for _, findings, _, _ in results:
         for f in findings:
             if SEVERITIES.index(f["severity"]) <= threshold:
                 return 1
     return 0
+
+
+def sarif_report(results):
+    """SARIF 2.1.0 — GitHub Code Scanning ingests this and shows findings
+    inline on PRs and in the repository's Security tab."""
+    sev_map = {"CRITICAL": "error", "HIGH": "error", "MEDIUM": "warning",
+               "LOW": "note", "INFO": "note"}
+    # GitHub ranks by security-severity (CVSS-like) when present.
+    score_map = {"CRITICAL": "9.5", "HIGH": "7.5", "MEDIUM": "5.0",
+                 "LOW": "3.0", "INFO": "0.0"}
+    rules = []
+    for r in RULES:
+        rules.append({
+            "id": r["id"],
+            "name": r["id"],
+            "shortDescription": {"text": r["title_en"]},
+            "fullDescription": {"text": "%s  /  %s" % (r["title_en"], r["title_zh"])},
+            "help": {
+                "text": "%s\n\n%s" % (r["advice_en"], r["advice_zh"]),
+                "markdown": "**%s**\n\n%s\n\n%s" % (r["title_en"], r["advice_en"],
+                                                    r["advice_zh"]),
+            },
+            "defaultConfiguration": {"level": sev_map[r["severity"]]},
+            "properties": {
+                "tags": ["security", "agent-skills", r["severity"].lower()],
+                "security-severity": score_map[r["severity"]],
+            },
+        })
+    seen_rules = set()
+    sarif_results = []
+    for skill, findings, _score, _grade in results:
+        for f in findings:
+            if f["severity"] == "INFO":
+                continue
+            seen_rules.add(f["rule"])
+            # Findings that describe the skill as a whole, or its frontmatter,
+            # carry a human label rather than a path. Code scanning needs a
+            # real file, so anchor those on SKILL.md.
+            where = f["file"]
+            if where.startswith("(") or " (" in where:
+                where = where.split(" (")[0] if " (" in where else "SKILL.md"
+            rel = os.path.join(skill.path, where).replace(os.sep, "/")
+            rel = re.sub(r"^\./", "", rel)
+            msg = f["title_en"]
+            if f.get("note"):
+                msg += " (%s)" % f["note"]
+            if f.get("excerpt"):
+                msg += "\n> %s" % f["excerpt"]
+            sarif_results.append({
+                "ruleId": f["rule"],
+                "level": sev_map[f["severity"]],
+                "message": {"text": msg},
+                "locations": [{
+                    "physicalLocation": {
+                        "artifactLocation": {"uri": rel},
+                        "region": {"startLine": max(1, f["line"] or 1)},
+                    }
+                }],
+                "properties": {"skill": skill.name, "severity": f["severity"]},
+            })
+    return {
+        "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+        "version": "2.1.0",
+        "runs": [{
+            "tool": {"driver": {
+                "name": "skillxray",
+                "version": __version__,
+                "informationUri": "https://github.com/aixintan90/skillxray",
+                "rules": rules,
+            }},
+            "results": sarif_results,
+        }],
+    }
+
+
+def markdown_report(results, lang="en"):
+    """A GitHub-flavoured summary, for Action job summaries and PR comments."""
+    lines = []
+    total = len(results)
+    counts = dict((s, 0) for s in SEVERITIES)
+    for _s, findings, _sc, _g in results:
+        for f in findings:
+            counts[f["severity"]] += 1
+    worst = next((s for s in SEVERITIES if counts[s]), None)
+    icon = {"CRITICAL": "🛑", "HIGH": "🚨", "MEDIUM": "⚠️",
+            "LOW": "🔵", "INFO": "ℹ️"}
+    headline = ("🛑 skillxray found critical issues" if counts["CRITICAL"] else
+                "🚨 skillxray found high-severity issues" if counts["HIGH"] else
+                "⚠️ skillxray found issues to review" if counts["MEDIUM"] else
+                "✅ skillxray found nothing above LOW")
+    lines.append("## %s" % headline)
+    lines.append("")
+    tally = ", ".join("**%d** %s" % (counts[s], s.lower())
+                      for s in SEVERITIES if counts[s]) or "**0** findings"
+    lines.append("x-rayed **%d** skill(s) — %s" % (total, tally))
+    lines.append("")
+    lines.append("| Skill | Grade | Score | Findings |")
+    lines.append("|---|:--:|--:|---|")
+    for skill, findings, score, grade in sorted(
+            results, key=lambda r: r[2]):
+        top = [f for f in findings if f["severity"] != "INFO"]
+        summary = ", ".join("%s %s" % (icon[f["severity"]], f["rule"])
+                            for f in top[:3]) or "—"
+        if len(top) > 3:
+            summary += " +%d more" % (len(top) - 3)
+        lines.append("| `%s` | **%s** | %d | %s |" % (skill.name, grade, score, summary))
+    detailed = [(s, f) for s, findings, _sc, _g in results for f in findings
+                if f["severity"] in ("CRITICAL", "HIGH")]
+    if detailed:
+        lines.append("")
+        lines.append("<details><summary><b>Critical &amp; high findings</b></summary>")
+        lines.append("")
+        for skill, f in detailed:
+            loc = "%s%s" % (f["file"], ":%d" % f["line"] if f["line"] else "")
+            lines.append("- **%s** `%s` — %s" % (f["severity"], skill.name, f["title_en"]))
+            lines.append("  - `%s` — %s" % (loc, f["excerpt"]))
+            lines.append("  - ↳ %s" % f["advice_en"])
+        lines.append("")
+        lines.append("</details>")
+    lines.append("")
+    lines.append("<sub>Scanned by [skillxray](https://github.com/aixintan90/skillxray) "
+                 "v%s — a security scanner for AI agent skills. "
+                 "Findings are for human review, not a guarantee of safety.</sub>" % __version__)
+    return "\n".join(lines)
 
 
 def cmd_rules(pal, as_json):
@@ -1089,7 +1290,9 @@ def print_usage(pal):
     print("")
     print(pal.bold("options:"))
     print("  --lang en|zh|both    report language (default: auto)")
-    print("  --json               machine-readable output")
+    print("  --format FMT         text (default), json, sarif, markdown")
+    print("  --out FILE           write the report to a file instead of stdout")
+    print("  --json               shorthand for --format json")
     print("  --fail-on SEV        exit 1 at/above this severity (default: high)")
     print("  --verbose            include INFO-level findings")
     print("  --no-color           plain output")
@@ -1105,6 +1308,8 @@ def main(argv=None):
     as_json = False
     verbose = False
     fail_on = "HIGH"
+    fmt = "text"
+    out = None
     rest = []
     i = 0
     while i < len(argv):
@@ -1112,6 +1317,14 @@ def main(argv=None):
         if a == "--":
             rest.extend(argv[i + 1:])
             break
+        if a == "--format" and i + 1 < len(argv):
+            fmt = argv[i + 1].lower(); i += 2; continue
+        if a.startswith("--format="):
+            fmt = a.split("=", 1)[1].lower(); i += 1; continue
+        if a == "--out" and i + 1 < len(argv):
+            out = argv[i + 1]; i += 2; continue
+        if a.startswith("--out="):
+            out = a.split("=", 1)[1]; i += 1; continue
         if a == "--lang" and i + 1 < len(argv):
             lang = argv[i + 1].lower(); i += 2; continue
         if a.startswith("--lang="):
@@ -1142,6 +1355,10 @@ def main(argv=None):
         print("skillxray: unknown --fail-on %r (use %s)" %
               (fail_on, "/".join(s.lower() for s in SEVERITIES)))
         return 2
+    if fmt not in ("text", "json", "sarif", "markdown"):
+        print("skillxray: unknown --format %r (use text, json, sarif or markdown)"
+              % fmt)
+        return 2
 
     pal = make_palette(no_color)
     lang = pick_lang(lang)
@@ -1151,7 +1368,7 @@ def main(argv=None):
         return 2
     cmd = argv[0]
     if cmd == "scan":
-        return cmd_scan(argv[1:], pal, lang, as_json, fail_on, verbose)
+        return cmd_scan(argv[1:], pal, lang, as_json, fail_on, verbose, fmt, out)
     if cmd == "lock":
         return cmd_lock(default_roots(), pal, as_json)
     if cmd == "verify":

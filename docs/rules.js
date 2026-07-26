@@ -204,6 +204,28 @@ window.SKILLXRAY = {
       "title_zh": "技能注册了 hooks（在 Agent 事件上自动执行命令）"
     },
     {
+      "advice_en": "Renderers fetch images automatically — a URL query string is a silent outbound channel. Check what goes in it.",
+      "advice_zh": "渲染器会自动加载图片——URL 的查询串就是一条无声的外发通道。看清楚里面塞了什么。",
+      "check": "image-exfil",
+      "id": "SXR022",
+      "kind": "builtin",
+      "severity": "HIGH",
+      "title_en": "Markdown image/link that could carry stolen data off-site",
+      "title_zh": "Markdown 图片/链接可能把偷到的数据带出去"
+    },
+    {
+      "advice_en": "An MCP server is code that runs and receives your agent's data. Verify the command and its source before allowing it.",
+      "advice_zh": "MCP 服务器是会运行、并能收到你 Agent 数据的代码。允许之前先核实它的启动命令和来源。",
+      "flags": "i",
+      "id": "SXR023",
+      "kind": "pattern",
+      "pattern": "mcpServers|\\.mcp\\.json|claude\\s+mcp\\s+add|(register|install|add)[^\\n]{0,40}MCP\\s+server",
+      "severity": "HIGH",
+      "target": "any_text",
+      "title_en": "Registers an MCP server (grants the agent a new tool backend)",
+      "title_zh": "注册 MCP 服务器（等于给 Agent 接上一个新的工具后端）"
+    },
+    {
       "advice_en": "URL installs bypass registry review entirely.",
       "advice_zh": "从 URL 直装依赖会完全绕过包仓库的审查。",
       "flags": "i",

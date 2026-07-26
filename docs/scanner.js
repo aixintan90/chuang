@@ -52,6 +52,18 @@
   var MENTION_WORDS = /\b(avoid|avoids|avoiding|never|don'?t|do not|instead of|rather than|example|examples|e\.g\.|such as|like this|anti-?pattern|bad practice|malicious|attack|attacker|injection|exploit|suspicious|red flag|detect|detects|detecting|scanner|warning sign|beware|watch out|避免|不要|切勿|例如|比如|恶意|攻击|注入|反面)\b/i;
   var COMMAND_LINE = /^\s*(#|\/\/|\*|>)?\s*(sudo\s+)?(echo|printf|cat|curl|wget|iwr|irm|Invoke-\w+|bash|sh|zsh|eval|exec|python\d?|node|npm|npx|pip\d?|go|cargo|gem|tee|chmod|rm)\b|[|;&]{1,2}\s*(sudo\s+)?(ba|z)?sh\b|\|\s*iex\b|>>\s*["']?[~/$]/i;
 
+  function inCodeContext(text, start, end) {
+    var before = text.slice(0, start);
+    var fences = (before.match(/\n```/g) || []).length;
+    if (fences % 2 === 1 || before.indexOf("```") === 0) return true;
+    var lineStart = before.lastIndexOf("\n") + 1;
+    var lineEnd = text.indexOf("\n", end);
+    var line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd);
+    var rel = start - lineStart;
+    var ticks = (line.slice(0, rel).match(/`/g) || []).length;
+    return ticks % 2 === 1;
+  }
+
   function isMention(text, start, end) {
     var lineStart = text.lastIndexOf("\n", start - 1) + 1;
     var lineEnd = text.indexOf("\n", end);
@@ -62,6 +74,7 @@
     var rq = right.split("\n")[0];
     if (MENTION_WORDS.test(lq + " " + rq)) return true;
     if (COMMAND_LINE.test(physical)) return false;
+    if (inCodeContext(text, start, end)) return false;
     var pairs = [['"', '"'], ["'", "'"], ["“", "”"], ["「", "」"]];
     for (var i = 0; i < pairs.length; i++) {
       if (lq.slice(-40).indexOf(pairs[i][0]) !== -1 &&
@@ -168,6 +181,20 @@
         Object.keys(doms).sort().slice(0, 5).forEach(function (d) {
           out.push(mk(rule, "SKILL.md", doms[d], d));
         });
+        break;
+      case "image-exfil":
+        var badgeHosts = ["shields.io", "img.shields.io", "badgen.net",
+          "badge.fury.io", "codecov.io", "circleci.com", "travis-ci.org",
+          "travis-ci.com", "appveyor.com", "coveralls.io", "snyk.io",
+          "githubusercontent.com", "github.com", "gitlab.com"];
+        var img = /!\[[^\]]*\]\(\s*(https?:\/\/([A-Za-z0-9.-]+)[^)\s]*)/g;
+        while ((m = img.exec(text))) {
+          var iurl = m[1], ihost = m[2].toLowerCase();
+          if (iurl.indexOf("?") === -1) continue;
+          if (badgeHosts.some(function (b) { return ihost === b || ihost.slice(-(b.length + 1)) === "." + b; })) continue;
+          out.push(mk(rule, "SKILL.md", lineOf(text, m.index), iurl.slice(0, 90)));
+          break;
+        }
         break;
       case "desc-mismatch":
         var desc = (skill.fields.description || "").toLowerCase();

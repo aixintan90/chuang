@@ -1,0 +1,120 @@
+name: "skillxray — scan AI agent skills"
+description: "X-ray the agent skills in your repo for prompt injection, data exfiltration and hidden instructions. Zero dependencies."
+author: "aixintan90"
+branding:
+  icon: "search"
+  color: "green"
+
+inputs:
+  path:
+    description: "Directory to scan. Defaults to the whole repo (finds .claude/skills, .agents/skills, skills/ … automatically)."
+    required: false
+    default: "."
+  fail-on:
+    description: "Fail the job when a finding at or above this severity is present: critical | high | medium | low. Use 'none' to never fail."
+    required: false
+    default: "high"
+  comment-on-pr:
+    description: "Post the report as a pull-request comment (needs pull-requests: write)."
+    required: false
+    default: "true"
+  upload-sarif:
+    description: "Write a SARIF file for GitHub code scanning. The calling workflow uploads it with github/codeql-action/upload-sarif (needs security-events: write)."
+    required: false
+    default: "true"
+  sarif-file:
+    description: "Where to write the SARIF report."
+    required: false
+    default: "skillxray.sarif"
+
+outputs:
+  grade:
+    description: "Worst grade across all scanned skills (A–F, or ? when no skill was found)."
+    value: ${{ steps.scan.outputs.grade }}
+  findings:
+    description: "Number of findings above INFO."
+    value: ${{ steps.scan.outputs.findings }}
+  sarif-file:
+    description: "Path to the SARIF report, when one was written."
+    value: ${{ steps.scan.outputs.sarif_file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Run skillxray
+      id: scan
+      shell: bash
+      env:
+        SX_PATH: ${{ inputs.path }}
+        SX_FAIL_ON: ${{ inputs.fail-on }}
+        SX_SARIF: ${{ inputs.sarif-file }}
+        SX_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
+      run: |
+        set -euo pipefail
+        SX="${GITHUB_ACTION_PATH}/skillxray.py"
+        python "$SX" --version
+
+        # Human-readable log
+        set +e
+        python "$SX" scan "$SX_PATH" --no-color --lang en
+        set -e
+
+        # Machine-readable artefacts
+        python "$SX" scan "$SX_PATH" --format json --out skillxray.json >/dev/null || true
+        if [ "$SX_UPLOAD_SARIF" = "true" ]; then
+          python "$SX" scan "$SX_PATH" --format sarif --out "$SX_SARIF" >/dev/null || true
+          echo "sarif_file=$SX_SARIF" >> "$GITHUB_OUTPUT"
+        fi
+        python "$SX" scan "$SX_PATH" --format markdown --out skillxray.md >/dev/null || true
+        cat skillxray.md >> "$GITHUB_STEP_SUMMARY"
+
+        python - <<'PY' >> "$GITHUB_OUTPUT"
+        import json, os
+        order = "ABCDF?"
+        try:
+            data = json.load(open("skillxray.json", encoding="utf-8"))
+        except Exception:
+            data = []
+        worst = "A"
+        findings = 0
+        for s in data:
+            g = s.get("grade", "?")
+            if order.index(g if g in order else "?") > order.index(worst):
+                worst = g
+            findings += sum(1 for f in s.get("findings", [])
+                            if f.get("severity") != "INFO")
+        print("grade=%s" % (worst if data else "?"))
+        print("findings=%d" % findings)
+        print("skills=%d" % len(data))
+        PY
+
+        # Gate the job
+        if [ "$SX_FAIL_ON" != "none" ]; then
+          python "$SX" scan "$SX_PATH" --no-color --fail-on "$SX_FAIL_ON" >/dev/null
+        fi
+
+    - name: Comment on the pull request
+      if: ${{ always() && inputs.comment-on-pr == 'true' && github.event_name == 'pull_request' }}
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          let body;
+          try { body = fs.readFileSync('skillxray.md', 'utf8'); }
+          catch (e) { return; }
+          const marker = '<!-- skillxray-report -->';
+          body = marker + '\n' + body;
+          const { owner, repo } = context.repo;
+          const issue_number = context.payload.pull_request.number;
+          const existing = await github.rest.issues.listComments({ owner, repo, issue_number });
+          const mine = existing.data.find(c => c.body && c.body.includes(marker));
+          if (mine) {
+            await github.rest.issues.updateComment({ owner, repo, comment_id: mine.id, body });
+          } else {
+            await github.rest.issues.createComment({ owner, repo, issue_number, body });
+          }

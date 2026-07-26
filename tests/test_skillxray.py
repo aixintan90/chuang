@@ -90,6 +90,35 @@ class MaliciousTests(unittest.TestCase):
             any(f["rule"] == "SXR001" and f["severity"] == "CRITICAL"
                 for f in findings))
 
+    def test_markdown_image_exfil_caught(self):
+        # Renderers auto-fetch images: a query string is a silent channel.
+        _, findings, _score, grade = self.scan("evil-imgexfil")
+        self.assertIn("SXR022", self.rules_fired(findings))
+        self.assertNotEqual(grade, "A")
+
+    def test_badge_images_are_not_flagged(self):
+        # Every README has shields.io badges with query strings — flagging
+        # those would make the rule useless.
+        with tempfile.TemporaryDirectory() as tmp:
+            d = write_skill(tmp, "badged",
+                "---\nname: badged\ndescription: A skill with badges.\n---\n\n"
+                "# T\n\n"
+                "![build](https://img.shields.io/badge/build-passing-green.svg?style=flat)\n"
+                "![cov](https://codecov.io/gh/o/r/badge.svg?token=abc)\n")
+            _, findings, _score, _g = sx.scan_skill(d)
+            self.assertNotIn("SXR022", {f["rule"] for f in findings})
+
+    def test_mcp_registration_caught(self):
+        _, findings, _score, grade = self.scan("evil-mcp")
+        fired = self.rules_fired(findings)
+        self.assertIn("SXR023", fired)   # MCP server registration
+        self.assertIn("SXR016", fired)   # bypassPermissions nudge
+        # The bypass nudge sits inside JSON quotes but is a real instruction:
+        # code quoting must not demote it away.
+        bypass = [f for f in findings if f["rule"] == "SXR016"]
+        self.assertTrue(any(f["severity"] == "HIGH" for f in bypass),
+                        "config-quoted payload was wrongly demoted")
+
     def test_hidden_unicode_caught(self):
         _, findings, score, grade = self.scan("evil-hidden")
         self.assertIn("SXR004", self.rules_fired(findings))
@@ -244,6 +273,92 @@ class CliTests(unittest.TestCase):
         code, out = self.run_main(["--version"])
         self.assertEqual(code, 0)
         self.assertIn("skillxray", out)
+
+
+class ReportFormatTests(unittest.TestCase):
+    """SARIF and Markdown are consumed by GitHub — their shape is a contract."""
+
+    def setUp(self):
+        self.results = [sx.scan_skill(os.path.join(FIX, n))
+                        for n in ("evil-exfil", "evil-injection",
+                                  "clean-formatter")]
+
+    def test_sarif_structure(self):
+        doc = sx.sarif_report(self.results)
+        self.assertEqual(doc["version"], "2.1.0")
+        run = doc["runs"][0]
+        self.assertEqual(run["tool"]["driver"]["name"], "skillxray")
+        declared = {r["id"] for r in run["tool"]["driver"]["rules"]}
+        self.assertEqual(len(declared), len(sx.RULES))
+        for res in run["results"]:
+            self.assertIn(res["ruleId"], declared)
+            self.assertIn(res["level"], ("error", "warning", "note"))
+            loc = res["locations"][0]["physicalLocation"]
+            # GitHub code scanning needs real paths and 1-based lines
+            uri = loc["artifactLocation"]["uri"]
+            self.assertNotIn("(", uri, "pseudo-location leaked into SARIF uri")
+            self.assertTrue(os.path.isfile(uri), "SARIF uri is not a file: %s" % uri)
+            self.assertGreaterEqual(loc["region"]["startLine"], 1)
+
+    def test_sarif_omits_info_findings(self):
+        doc = sx.sarif_report(self.results)
+        for res in doc["runs"][0]["results"]:
+            self.assertNotEqual(res["properties"]["severity"], "INFO")
+
+    def test_sarif_declares_security_severity(self):
+        doc = sx.sarif_report(self.results)
+        for r in doc["runs"][0]["tool"]["driver"]["rules"]:
+            self.assertIn("security-severity", r["properties"])
+
+    def test_markdown_report(self):
+        md = sx.markdown_report(self.results)
+        self.assertIn("skillxray", md)
+        self.assertIn("| Skill | Grade | Score | Findings |", md)
+        self.assertIn("evil-exfil", md)
+        self.assertIn("**F**", md)
+        # worst-first ordering puts the failing skill above the clean one
+        self.assertLess(md.index("evil-exfil"), md.index("clean-formatter"))
+
+    def test_markdown_clean_headline(self):
+        clean = [sx.scan_skill(os.path.join(FIX, "clean-formatter"))]
+        md = sx.markdown_report(clean)
+        self.assertIn("nothing above LOW", md)
+
+
+class FormatCliTests(unittest.TestCase):
+    def run_main(self, argv):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = sx.main(argv)
+        return code, buf.getvalue()
+
+    def test_format_sarif_to_stdout(self):
+        code, out = self.run_main(
+            ["scan", os.path.join(FIX, "clean-formatter"), "--format", "sarif"])
+        self.assertEqual(code, 0)
+        self.assertEqual(json.loads(out)["version"], "2.1.0")
+
+    def test_format_written_to_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            dest = os.path.join(tmp, "r.sarif")
+            code, _ = self.run_main(
+                ["scan", os.path.join(FIX, "clean-formatter"),
+                 "--format", "sarif", "--out", dest, "--no-color"])
+            self.assertEqual(code, 0)
+            with io.open(dest, encoding="utf-8") as f:
+                self.assertEqual(json.load(f)["version"], "2.1.0")
+
+    def test_unknown_format_rejected(self):
+        code, _ = self.run_main(["scan", FIX, "--format", "xml"])
+        self.assertEqual(code, 2)
+
+    def test_format_does_not_change_exit_code(self):
+        # A malicious skill still fails the gate regardless of output format.
+        for fmt in ("text", "json", "sarif", "markdown"):
+            code, _ = self.run_main(
+                ["scan", os.path.join(FIX, "evil-injection"),
+                 "--format", fmt, "--no-color"])
+            self.assertEqual(code, 1, "format %s changed the exit code" % fmt)
 
 
 if __name__ == "__main__":

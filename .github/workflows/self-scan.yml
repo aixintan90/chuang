@@ -1,0 +1,45 @@
+name: skillxray self-scan
+
+# Dogfooding: skillxray scans this repository's own skill fixtures with the
+# published Action on every push and PR. It is also the working example that
+# the README points people at.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"      # weekly, in case a rule regresses
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: X-ray the skills in this repo
+        id: xray
+        uses: ./
+        with:
+          # tests/fixtures deliberately contains malicious samples, so this
+          # demo scans only the clean one — a real repo would just use "."
+          path: tests/fixtures/clean-formatter
+          fail-on: high
+
+      - name: Upload SARIF to code scanning
+        if: always() && steps.xray.outputs.sarif-file != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.xray.outputs.sarif-file }}
+          category: skillxray
+
+      - name: Show outputs
+        if: always()
+        run: |
+          echo "grade:    ${{ steps.xray.outputs.grade }}"
+          echo "findings: ${{ steps.xray.outputs.findings }}"
