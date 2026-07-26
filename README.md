@@ -9,7 +9,7 @@ Catches prompt injection, data exfiltration, hidden instructions and more —
 offline, bilingual (EN / 中文), in one command.*
 
 [![CI](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml)
-[![Pages](https://github.com/aixintan90/skillxray/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/skillxray/)
+[![Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-skillxray-2ea44f?logo=github)](https://github.com/marketplace/actions/skillxray-scan-ai-agent-skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
@@ -159,7 +159,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: xray
-        uses: aixintan90/skillxray@main
+        uses: aixintan90/skillxray@v0.2.0
         with:
           path: .              # default: finds .claude/skills, .agents/skills, …
           fail-on: high        # critical | high | medium | low | none

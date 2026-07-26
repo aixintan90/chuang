@@ -8,7 +8,7 @@
 检测提示注入、数据外传、隐形指令等风险 —— 离线、中英双语、一条命令搞定。*
 
 [![CI](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml/badge.svg)](https://github.com/aixintan90/skillxray/actions/workflows/ci.yml)
-[![Pages](https://github.com/aixintan90/skillxray/actions/workflows/pages.yml/badge.svg)](https://aixintan90.github.io/skillxray/)
+[![Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-skillxray-2ea44f?logo=github)](https://github.com/marketplace/actions/skillxray-scan-ai-agent-skills)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
