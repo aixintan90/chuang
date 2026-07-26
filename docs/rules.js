@@ -22,12 +22,10 @@ window.SKILLXRAY = {
     {
       "advice_en": "Never run remote code sight unseen. Download, read, then run.",
       "advice_zh": "绝不要盲执行远程代码。先下载、读完、再运行。",
-      "flags": "i",
+      "check": "curl-pipe-shell",
       "id": "SXR001",
-      "kind": "pattern",
-      "pattern": "(curl|wget|iwr|irm|Invoke-WebRequest)[^\\n|]*\\|\\s*(sudo\\s+)?(ba|z)?sh\\b|(curl|wget|iwr|irm)[^\\n|]*\\|\\s*iex\\b",
+      "kind": "builtin",
       "severity": "CRITICAL",
-      "target": "any_text",
       "title_en": "Downloads a script and pipes it straight into a shell",
       "title_zh": "下载脚本并直接管道进 shell 执行（curl | bash）"
     },
@@ -139,7 +137,7 @@ window.SKILLXRAY = {
       "flags": "i",
       "id": "SXR011",
       "kind": "pattern",
-      "pattern": "~/\\.ssh|id_rsa|id_ed25519|\\.aws/credentials|\\.netrc|_netrc|\\.npmrc|authorized_keys|/etc/shadow|(Login Data|Cookies)\\b",
+      "pattern": "~/\\.ssh|id_rsa|id_ed25519|\\.aws/credentials|\\.netrc|_netrc|\\.npmrc|authorized_keys|/etc/shadow|[/\\\\](Login Data|Cookies)(\\b|$)",
       "severity": "HIGH",
       "target": "any_text",
       "title_en": "References credential / secret file paths",

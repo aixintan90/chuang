@@ -187,9 +187,7 @@ def is_mention(text, start, end):
 
 RULES = [
     # ----------------------------------------------------------- CRITICAL
-    dict(id="SXR001", severity="CRITICAL", kind="pattern", target="any_text",
-         pattern=r"(curl|wget|iwr|irm|Invoke-WebRequest)[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b|(curl|wget|iwr|irm)[^\n|]*\|\s*iex\b",
-         flags="i",
+    dict(id="SXR001", severity="CRITICAL", kind="builtin", check="curl-pipe-shell",
          title_en="Downloads a script and pipes it straight into a shell",
          title_zh="下载脚本并直接管道进 shell 执行（curl | bash）",
          advice_en="Never run remote code sight unseen. Download, read, then run.",
@@ -253,8 +251,12 @@ RULES = [
          title_zh="同一技能里既读取凭据路径、又存在网络上传",
          advice_en="The classic exfiltration shape. Treat as hostile until proven otherwise.",
          advice_zh="教科书级的数据外传形态。除非证明无害，否则按恶意处理。"),
+    # "Cookies"/"Login Data" are the browser credential *stores*, so they only
+    # count with a path around them. Bare "cookies" is an ordinary web word —
+    # matching it flagged `import { cookies } from "next/headers"` and even
+    # advice that said "never store cookies", which is the opposite of a threat.
     dict(id="SXR011", severity="HIGH", kind="pattern", target="any_text",
-         pattern=r"~/\.ssh|id_rsa|id_ed25519|\.aws/credentials|\.netrc|_netrc|\.npmrc|authorized_keys|/etc/shadow|(Login Data|Cookies)\b",
+         pattern=r"~/\.ssh|id_rsa|id_ed25519|\.aws/credentials|\.netrc|_netrc|\.npmrc|authorized_keys|/etc/shadow|[/\\](Login Data|Cookies)(\b|$)",
          flags="i",
          title_en="References credential / secret file paths",
          title_zh="引用了凭据或密钥文件路径（~/.ssh、.aws/credentials 等）",
@@ -732,7 +734,47 @@ def run_builtin_rule(rule, skill, all_findings):
     check = rule["check"]
     out = []
 
-    if check == "unicode-tags":
+    if check == "curl-pipe-shell":
+        # Piping a download into a shell is always worth surfacing, but the
+        # documented install path for uv, rustup, Docker et al. is exactly
+        # this. Calling those CRITICAL is how a scanner trains people to
+        # ignore it, so a known installer host is reported one level down.
+        official = ("astral.sh", "sh.rustup.rs", "rustup.rs", "get.docker.com",
+                    "deb.nodesource.com", "install.python-poetry.org",
+                    "bun.sh", "get.pnpm.io", "fnm.vercel.app", "ollama.com",
+                    "ollama.ai", "raw.githubusercontent.com", "brew.sh",
+                    "nixos.org", "cli.github.com", "sdk.cloud.google.com",
+                    "get.helm.sh", "starship.rs", "getcomposer.org",
+                    "install.determinate.systems", "sh.uv.dev", "deno.land")
+        rx = re.compile(
+            r"(curl|wget|iwr|irm|Invoke-WebRequest)[^\n|]*\|\s*(sudo\s+)?(ba|z)?sh\b"
+            r"|(curl|wget|iwr|irm)[^\n|]*\|\s*iex\b", re.IGNORECASE)
+        host_rx = re.compile(r"https?://([A-Za-z0-9.-]+)")
+        for where, text in skill.target_text("any_text"):
+            if rule["id"] in skill.ignored.get(where, ()):
+                continue
+            seen = set()
+            for m in rx.finditer(text):
+                ln = line_of(text, m.start())
+                if ln in seen:
+                    continue
+                seen.add(ln)
+                sev = rule["severity"]
+                note = ""
+                hm = host_rx.search(m.group(0))
+                host = (hm.group(1).lower() if hm else "")
+                if host and any(host == o or host.endswith("." + o) for o in official):
+                    sev, note = demote(sev, 2), "well-known installer host"
+                elif skill.is_reference(where):
+                    sev = demote(sev)
+                if is_mention(text, m.start(), m.end()):
+                    sev, note = demote(sev, 2), "quoted/discussed, not issued"
+                out.append(finding(rule, where, ln,
+                                   excerpt_at(text, m.start()), sev, note))
+                if len(seen) >= 3:
+                    break
+
+    elif check == "unicode-tags":
         # U+E0000–U+E007F mirrors printable ASCII invisibly. Unlike a stray
         # zero-width space, this block never arrives by accident.
         for where, text in skill.target_text("any_text"):
