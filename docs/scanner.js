@@ -144,6 +144,20 @@
   function runBuiltin(rule, skill, all) {
     var out = [], text = skill.text, m;
     switch (rule.check) {
+      case "unicode-tags":
+        var tags = [];
+        for (var ti = 0; ti < text.length; ti++) {
+          var cp = text.codePointAt(ti);
+          if (cp >= 0xE0000 && cp <= 0xE007F) tags.push([ti, cp]);
+          if (cp > 0xFFFF) ti++;
+        }
+        if (tags.length) {
+          var dec = tags.filter(function (t) { return t[1] >= 0xE0020 && t[1] <= 0xE007E; })
+            .map(function (t) { return String.fromCharCode(t[1] - 0xE0000); }).join("").slice(0, 60);
+          out.push(mk(rule, "SKILL.md", lineOf(text, tags[0][0]),
+            tags.length + " tag char(s)" + (dec ? "; decodes to: " + dec : "")));
+        }
+        break;
       case "unicode-hidden":
         var bad = [];
         for (var i = 0; i < text.length; i++) {

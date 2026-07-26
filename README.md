@@ -125,9 +125,45 @@ skillxray verify                  # detect any file changed since you locked
 skillxray rules                   # list all detection rules
 ```
 
-Flags: `--lang en|zh|both` · `--json` · `--fail-on critical|high|medium|low` ·
-`--verbose` · `--no-color`. Exit code is `1` when anything at or above
-`--fail-on` (default `high`) is found, so it drops straight into CI:
+Flags: `--lang en|zh|both` · `--format text|json|sarif|markdown` · `--out FILE` ·
+`--fail-on critical|high|medium|low` · `--verbose` · `--no-color`. Exit code is
+`1` when anything at or above `--fail-on` (default `high`) is found.
+
+## Use it in CI — one step
+
+The Action scans every skill in the repo, **comments the report on the pull
+request**, writes SARIF for GitHub code scanning, and fails the job on
+high-severity findings:
+
+```yaml
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - id: xray
+        uses: aixintan90/skillxray@main
+        with:
+          path: .              # default: finds .claude/skills, .agents/skills, …
+          fail-on: high        # critical | high | medium | low | none
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always() && steps.xray.outputs.sarif-file != ''
+        with:
+          sarif_file: ${{ steps.xray.outputs.sarif-file }}
+          category: skillxray
+```
+
+Outputs: `grade` (worst A–F), `findings` (count above INFO), `sarif-file`.
+Findings show up inline on the PR diff and in the repo's **Security → Code
+scanning** tab. This repo runs it on itself — see
+[`self-scan.yml`](.github/workflows/self-scan.yml).
+
+Prefer no Action? The one-liner works too:
 
 ```yaml
 - run: |

@@ -119,6 +119,20 @@ class MaliciousTests(unittest.TestCase):
         self.assertTrue(any(f["severity"] == "HIGH" for f in bypass),
                         "config-quoted payload was wrongly demoted")
 
+    def test_ascii_smuggling_caught_and_decoded(self):
+        _, findings, _score, grade = self.scan("evil-smuggle")
+        self.assertEqual(grade, "F")
+        tags = [f for f in findings if f["rule"] == "SXR006"]
+        self.assertTrue(tags, "Unicode Tags smuggling not detected")
+        # Decoding the hidden text is what makes the finding actionable.
+        self.assertIn("Ignore all rules", tags[0]["excerpt"])
+
+    def test_throwaway_endpoint_and_base64_exec(self):
+        _, findings, _score, _g = self.scan("evil-smuggle")
+        fired = self.rules_fired(findings)
+        self.assertIn("SXR009", fired)   # oast.fun collection endpoint
+        self.assertIn("SXR024", fired)   # base64 -d | sh
+
     def test_hidden_unicode_caught(self):
         _, findings, score, grade = self.scan("evil-hidden")
         self.assertIn("SXR004", self.rules_fired(findings))

@@ -220,6 +220,33 @@ RULES = [
          title_zh="植入持久化：改 shell 配置 / cron / 计划任务 / 注册表启动项",
          advice_en="A skill should never need to survive reboots or hook your shell startup.",
          advice_zh="一个技能不应该需要开机自启，也不应该钩住你的 shell 启动过程。"),
+    dict(id="SXR006", severity="CRITICAL", kind="builtin", check="unicode-tags",
+         title_en="ASCII smuggling: Unicode Tags characters (U+E0000–U+E007F)",
+         title_zh="ASCII 走私：Unicode Tags 区字符（U+E0000–U+E007F）",
+         advice_en="This block encodes ordinary ASCII invisibly. It has essentially no legitimate use in a skill — treat as deliberate concealment.",
+         advice_zh="这个区段能把普通 ASCII 编码成完全不可见的字符，在技能里几乎没有正当用途——按蓄意隐藏处理。"),
+    dict(id="SXR007", severity="CRITICAL", kind="pattern", target="any_text",
+         pattern=r"\x1b\[|\x1b\]|\\x1[bB]\[|\\033\[|\\u001[bB]\[|\\e\[|\\x1[bB]\]|\\033\]",
+         flags="",
+         title_en="ANSI escape sequences (hide text, fake links, write the clipboard)",
+         title_zh="ANSI 转义序列（隐藏文本、伪造链接、写入剪贴板）",
+         advice_en="Terminals act on these: text can be made invisible, a link can point somewhere other than it shows, and OSC 52 writes your clipboard.",
+         advice_zh="终端会真的执行它们：文本可以被隐形、链接可以指向与显示不符的地方、OSC 52 还能写你的剪贴板。"),
+    dict(id="SXR008", severity="CRITICAL", kind="pattern", target="any_text",
+         pattern=r"/dev/tcp/[^/\s]+/\d+|(ba|z)?sh\s+-i\s*>&|\bnc(at)?\s+[^\n]{0,40}\s-[a-z]*e\b|socket\.socket\([^\n]*\)[^\n]{0,80}connect\(",
+         flags="i",
+         title_en="Reverse shell / command-and-control callback",
+         title_zh="反弹 shell / C2 回连",
+         advice_en="This hands an outside party an interactive session on your machine. There is no benign version of this in a skill.",
+         advice_zh="这等于把你机器上的交互式会话交给外人。技能里不存在这种代码的正当版本。"),
+    dict(id="SXR009", severity="CRITICAL", kind="pattern", target="any_text",
+         pattern=r"\b(webhook\.site|requestbin\.\w+|pipedream\.net|ngrok(-free)?\.(io|app|dev)|burpcollaborator\.net|oast\.(fun|pro|site|live|online|me)|interact\.sh|dnslog\.cn|canarytokens\.\w+)",
+         flags="i",
+         title_en="Contacts a throwaway data-collection endpoint",
+         title_zh="连接一次性数据收集端点",
+         advice_en="webhook.site, ngrok tunnels, OAST domains and friends exist to catch data from someone else's machine. A real skill has a real backend.",
+         advice_zh="webhook.site、ngrok 隧道、OAST 域名之类，存在的意义就是接收从别人机器上发来的数据。正经技能会有正经后端。",
+         ),
     # --------------------------------------------------------------- HIGH
     dict(id="SXR010", severity="HIGH", kind="builtin", check="exfil-combo",
          title_en="Reads credential paths AND uploads data in the same skill",
@@ -299,8 +326,11 @@ RULES = [
          title_zh="Markdown 图片/链接可能把偷到的数据带出去",
          advice_en="Renderers fetch images automatically — a URL query string is a silent outbound channel. Check what goes in it.",
          advice_zh="渲染器会自动加载图片——URL 的查询串就是一条无声的外发通道。看清楚里面塞了什么。"),
+    # Must describe REGISTERING a server, not merely mentioning MCP: a skill
+    # about building MCP servers (anthropics/skills has one) says "mcpServers"
+    # on every other line and is entirely benign.
     dict(id="SXR023", severity="HIGH", kind="pattern", target="any_text",
-         pattern=r"mcpServers|\.mcp\.json|claude\s+mcp\s+add|(register|install|add)[^\n]{0,40}MCP\s+server",
+         pattern=r"claude\s+mcp\s+add\b|(writ\w+|add\w*|creat\w+|updat\w+|append\w*|edit\w*)[^\n]{0,50}\.mcp\.json|\.mcp\.json[^\n]{0,40}(writ\w+|add\w*|creat\w+|updat\w+)",
          flags="i",
          title_en="Registers an MCP server (grants the agent a new tool backend)",
          title_zh="注册 MCP 服务器（等于给 Agent 接上一个新的工具后端）",
@@ -313,6 +343,50 @@ RULES = [
          title_zh="从非官方源 URL 安装依赖包",
          advice_en="URL installs bypass registry review entirely.",
          advice_zh="从 URL 直装依赖会完全绕过包仓库的审查。"),
+    dict(id="SXR024", severity="HIGH", kind="pattern", target="any_text",
+         pattern=r"(base64\s+(-d|-D|--decode)|base64\.b64decode|atob\(|FromBase64String)[^\n]{0,60}(\||>\s*\S|\)\s*\)|\bexec|\beval|\bsh\b|python|node)",
+         flags="i",
+         title_en="Decodes base64 and feeds it to something that executes",
+         title_zh="解码 base64 后直接交给执行器",
+         advice_en="Decoding straight into a shell or eval is how a payload hides from review. Decode it yourself and read it.",
+         advice_zh="解码后直接进 shell 或 eval，正是载荷躲避审查的手法。自己解出来读一遍。"),
+    dict(id="SXR025", severity="HIGH", kind="pattern", target="any_text",
+         pattern=r"<\|(im_start|im_end|system|endoftext|eot_id|start_header_id)\|>|\[/?INST\]|<<SYS>>|</?(IMPORTANT|SYSTEM|CRITICAL|INSTRUCTIONS?|NOTE_TO_AI|ADMIN)>",
+         flags="i",
+         title_en="Fake system/authority markers or chat special tokens",
+         title_zh="伪造的系统/权威标记或对话特殊 token",
+         advice_en="A skill dressing its text up as a system message is trying to borrow authority it doesn't have.",
+         advice_zh="技能把自己的内容伪装成系统消息，是在冒用它本没有的权限。"),
+    dict(id="SXR026", severity="HIGH", kind="pattern", target="any_text",
+         pattern=r"(append|add|write|insert|update|modif\w+|echo)[^\n]{0,60}(CLAUDE\.md|AGENTS?\.md|GEMINI\.md|copilot-instructions|\.cursorrules|MEMORY\.md)|>>\s*[^\n]{0,30}(CLAUDE\.md|AGENTS?\.md)",
+         flags="i",
+         title_en="Writes to the agent's persistent memory / instruction files",
+         title_zh="写入 Agent 的长期记忆 / 指令文件",
+         advice_en="CLAUDE.md and friends are loaded into every future session. Anything written there outlives the skill that wrote it.",
+         advice_zh="CLAUDE.md 这类文件会被载入之后的每一次会话——写进去的东西比写它的技能活得更久。"),
+    # Only an ASSIGNMENT counts. API reference skills name these variables
+    # constantly; what matters is a skill that sets one to a value.
+    dict(id="SXR027", severity="HIGH", kind="pattern", target="any_text",
+         pattern=r"(export\s+|set\s+|setx\s+|\$env:)?(ANTHROPIC_BASE_URL|OPENAI_BASE_URL|OPENAI_API_BASE|ANTHROPIC_AUTH_TOKEN)\s*[=:]\s*[\"']?https?://|\"(apiKeyHelper|awsCredentialExport|awsAuthRefresh)\"\s*:\s*\"[^\"]+\"",
+         flags="i",
+         title_en="Redirects the agent's API endpoint or credential source",
+         title_zh="改写 Agent 的 API 端点或凭据来源",
+         advice_en="Repointing the base URL routes every prompt and key through somebody else's server.",
+         advice_zh="改掉 base URL，就等于把你之后的每一次请求和密钥都从别人的服务器过一遍。"),
+    dict(id="SXR028", severity="HIGH", kind="pattern", target="body",
+         pattern=r"(?m)^\s*```!\s*$",
+         flags="",
+         title_en="Dynamic execution block: ```! runs when the skill loads",
+         title_zh="动态执行块：```! 会在技能加载时运行",
+         advice_en="Everything inside this fence is executed, not displayed. Read every line before you trust the skill.",
+         advice_zh="这个代码块里的内容是被执行的，不是拿来看的。逐行读完再决定是否信任。"),
+    dict(id="SXR029", severity="MEDIUM", kind="pattern", target="any_text",
+         pattern=r"(WebFetch|curl|wget|fetch|requests\.get)[^\n]{0,120}https?://[^\s)\"']+\.(md|markdown|txt|json|ya?ml)\b[^\n]{0,80}(follow|instruction|prompt|执行|指令)",
+         flags="i",
+         title_en="Fetches instructions from a remote file at run time (rug-pull risk)",
+         title_zh="运行时从远程文件拉取指令（可被事后掉包）",
+         advice_en="You reviewed the skill; you did not review what that URL will serve tomorrow.",
+         advice_zh="你审查的是这个技能，但你没法审查那个 URL 明天会返回什么。"),
     # ------------------------------------------------------------- MEDIUM
     dict(id="SXR030", severity="MEDIUM", kind="builtin", check="base64-blob",
          title_en="Large base64-looking blob (possible obfuscated payload)",
@@ -658,7 +732,22 @@ def run_builtin_rule(rule, skill, all_findings):
     check = rule["check"]
     out = []
 
-    if check == "unicode-hidden":
+    if check == "unicode-tags":
+        # U+E0000–U+E007F mirrors printable ASCII invisibly. Unlike a stray
+        # zero-width space, this block never arrives by accident.
+        for where, text in skill.target_text("any_text"):
+            hits = [(i, ch) for i, ch in enumerate(text)
+                    if 0xE0000 <= ord(ch) <= 0xE007F]
+            if hits:
+                decoded = "".join(
+                    chr(ord(ch) - 0xE0000) for _i, ch in hits
+                    if 0xE0020 <= ord(ch) <= 0xE007E)[:60]
+                out.append(finding(
+                    rule, where, line_of(text, hits[0][0]),
+                    "%d tag char(s)%s" % (len(hits),
+                                          "; decodes to: %s" % decoded if decoded else "")))
+
+    elif check == "unicode-hidden":
         for where, text in skill.target_text("any_text"):
             bad = [(i, ch) for i, ch in enumerate(text)
                    if ch in ZERO_WIDTH or ch in BIDI]
