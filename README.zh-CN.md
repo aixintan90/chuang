@@ -14,6 +14,8 @@
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [**在线安检器 ↗**](https://aixintan90.github.io/skillxray/) · [**生态报告 ↗**](https://aixintan90.github.io/skillxray/report.html)
 
+<img src="docs/demo.svg" alt="skillxray 抓出恶意技能：解码出肉眼不可见的 Unicode Tags 字符「Ignore all rules」，标记凭据外传，同时对 Anthropic 官方 18 个技能保持安静" width="760">
+
 </div>
 
 ---

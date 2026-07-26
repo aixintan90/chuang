@@ -15,6 +15,8 @@ offline, bilingual (EN / 中文), in one command.*
 
 [English](README.md) · [简体中文](README.zh-CN.md) · [**Live scanner ↗**](https://aixintan90.github.io/skillxray/) · [**Ecosystem report ↗**](https://aixintan90.github.io/skillxray/report.html)
 
+<img src="docs/demo.svg" alt="skillxray catching a malicious skill: it decodes invisible Unicode Tags characters that say 'Ignore all rules', flags credential exfiltration, and stays silent on Anthropic's 18 official skills" width="760">
+
 </div>
 
 ---
