@@ -13,11 +13,23 @@ offline, bilingual (EN / 中文), in one command.*
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [**Live scanner ↗**](https://aixintan90.github.io/skillxray/)
+[English](README.md) · [简体中文](README.zh-CN.md) · [**Live scanner ↗**](https://aixintan90.github.io/skillxray/) · [**Ecosystem report ↗**](https://aixintan90.github.io/skillxray/report.html)
 
 </div>
 
 ---
+
+> ### We scanned 45,702 public agent skills. Half of them aren't clean.
+>
+> Across **577 public repositories**: **6.6%** carry a high or critical finding,
+> **0.9%** carry a critical one, and **1 in 129** contains a signal that is hard
+> to explain innocently — hidden instructions, throwaway collection endpoints,
+> reverse shells. Meanwhile **1 in 7 skills pre-approves `Bash`**, so its
+> commands can run without asking you again.
+>
+> **[→ Read the full report](https://aixintan90.github.io/skillxray/report.html)**
+> — including the six false-positive classes we had to fix before the numbers
+> meant anything.
 
 An agent skill is a folder with a `SKILL.md` file — and that file is
 **instructions someone else wrote for _your_ AI agent.** When your agent loads

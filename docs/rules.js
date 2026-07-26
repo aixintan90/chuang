@@ -54,14 +54,14 @@ window.SKILLXRAY = {
       "title_zh": "指示 Agent 向用户隐瞒其行为"
     },
     {
-      "advice_en": "Invisible characters can smuggle instructions past human review. Inspect with a hex editor.",
-      "advice_zh": "不可见字符可以把指令偷运过人工审查。用十六进制查看器检查。",
+      "advice_en": "Bidi overrides reorder what you see versus what the model reads. Zero-width runs can smuggle text or break naive scanners. Inspect with a hex editor.",
+      "advice_zh": "双向覆盖字符会让你看到的顺序与模型读到的不一致；成串的零宽字符可用来夹带内容或绕过简单扫描。用十六进制查看器检查。",
       "check": "unicode-hidden",
       "id": "SXR004",
       "kind": "builtin",
       "severity": "CRITICAL",
-      "title_en": "Hidden text: zero-width or bidirectional-override characters",
-      "title_zh": "隐形文本：零宽字符或双向覆盖字符（肉眼不可见的指令通道）"
+      "title_en": "Hidden text: bidirectional-override or zero-width characters",
+      "title_zh": "隐形文本：双向覆盖字符或零宽字符（肉眼不可见的通道）"
     },
     {
       "advice_en": "A skill should never need to survive reboots or hook your shell startup.",
@@ -86,16 +86,16 @@ window.SKILLXRAY = {
       "title_zh": "ASCII 走私：Unicode Tags 区字符（U+E0000–U+E007F）"
     },
     {
-      "advice_en": "Terminals act on these: text can be made invisible, a link can point somewhere other than it shows, and OSC 52 writes your clipboard.",
-      "advice_zh": "终端会真的执行它们：文本可以被隐形、链接可以指向与显示不符的地方、OSC 52 还能写你的剪贴板。",
+      "advice_en": "Conceal (CSI 8m), OSC 8 hyperlinks and OSC 52 clipboard writes have no place in a skill's text.",
+      "advice_zh": "隐藏显示（CSI 8m）、OSC 8 伪链接、OSC 52 写剪贴板——技能正文里不该出现这些。",
       "flags": "",
       "id": "SXR007",
       "kind": "pattern",
-      "pattern": "\\x1b\\[|\\x1b\\]|\\\\x1[bB]\\[|\\\\033\\[|\\\\u001[bB]\\[|\\\\e\\[|\\\\x1[bB]\\]|\\\\033\\]",
+      "pattern": "(\\x1b|\\\\x1[bB]|\\\\033|\\\\e|\\\\u001[bB])(\\[8m|\\]8;;|\\]52;)",
       "severity": "CRITICAL",
       "target": "any_text",
-      "title_en": "ANSI escape sequences (hide text, fake links, write the clipboard)",
-      "title_zh": "ANSI 转义序列（隐藏文本、伪造链接、写入剪贴板）"
+      "title_en": "ANSI escapes that hide text, fake a link, or write your clipboard",
+      "title_zh": "用于隐藏文本、伪造链接或写入剪贴板的 ANSI 转义"
     },
     {
       "advice_en": "This hands an outside party an interactive session on your machine. There is no benign version of this in a skill.",
@@ -110,16 +110,28 @@ window.SKILLXRAY = {
       "title_zh": "反弹 shell / C2 回连"
     },
     {
-      "advice_en": "webhook.site, ngrok tunnels, OAST domains and friends exist to catch data from someone else's machine. A real skill has a real backend.",
-      "advice_zh": "webhook.site、ngrok 隧道、OAST 域名之类，存在的意义就是接收从别人机器上发来的数据。正经技能会有正经后端。",
+      "advice_en": "webhook.site, OAST and collaborator domains exist to catch data from someone else's machine. A real skill has a real backend.",
+      "advice_zh": "webhook.site、OAST、collaborator 这类域名，存在的意义就是接收从别人机器上发来的数据。正经技能会有正经后端。",
       "flags": "i",
       "id": "SXR009",
       "kind": "pattern",
-      "pattern": "\\b(webhook\\.site|requestbin\\.\\w+|pipedream\\.net|ngrok(-free)?\\.(io|app|dev)|burpcollaborator\\.net|oast\\.(fun|pro|site|live|online|me)|interact\\.sh|dnslog\\.cn|canarytokens\\.\\w+)",
+      "pattern": "\\b(webhook\\.site|requestbin\\.\\w+|pipedream\\.net|burpcollaborator\\.net|oast\\.(fun|pro|site|live|online|me)|interact\\.sh|dnslog\\.cn)",
       "severity": "CRITICAL",
       "target": "any_text",
       "title_en": "Contacts a throwaway data-collection endpoint",
       "title_zh": "连接一次性数据收集端点"
+    },
+    {
+      "advice_en": "Tunnels are ordinary dev tools, but they also make a local endpoint reachable from anywhere. Check what is being exposed.",
+      "advice_zh": "隧道是常见的开发工具，但它同时会让本地端口变得全网可达。确认暴露出去的是什么。",
+      "flags": "i",
+      "id": "SXR038",
+      "kind": "pattern",
+      "pattern": "\\b(ngrok(-free)?\\.(io|app|dev)|localtunnel\\.me|trycloudflare\\.com|serveo\\.net)",
+      "severity": "MEDIUM",
+      "target": "any_text",
+      "title_en": "Uses a public tunnel to expose a local service",
+      "title_zh": "使用公开隧道把本地服务暴露到公网"
     },
     {
       "advice_en": "The classic exfiltration shape. Treat as hostile until proven otherwise.",
@@ -287,7 +299,7 @@ window.SKILLXRAY = {
       "flags": "i",
       "id": "SXR024",
       "kind": "pattern",
-      "pattern": "(base64\\s+(-d|-D|--decode)|base64\\.b64decode|atob\\(|FromBase64String)[^\\n]{0,60}(\\||>\\s*\\S|\\)\\s*\\)|\\bexec|\\beval|\\bsh\\b|python|node)",
+      "pattern": "(base64\\s+(-d|-D|--decode)|base64\\.b64decode|atob\\(|FromBase64String)[^\\n]{0,80}(\\|\\s*(sudo\\s+)?(ba|z)?sh\\b|\\|\\s*python|\\|\\s*node|\\|\\s*iex\\b|\\bexec\\s*\\(|\\beval\\s*\\(|subprocess\\.|os\\.system|Invoke-Expression)|(\\|\\s*(sudo\\s+)?(ba|z)?sh\\b|\\beval\\s*\\(|\\bexec\\s*\\()[^\\n]{0,80}(base64\\s+(-d|-D|--decode)|b64decode)",
       "severity": "HIGH",
       "target": "any_text",
       "title_en": "Decodes base64 and feeds it to something that executes",
@@ -306,16 +318,16 @@ window.SKILLXRAY = {
       "title_zh": "伪造的系统/权威标记或对话特殊 token"
     },
     {
-      "advice_en": "CLAUDE.md and friends are loaded into every future session. Anything written there outlives the skill that wrote it.",
-      "advice_zh": "CLAUDE.md 这类文件会被载入之后的每一次会话——写进去的东西比写它的技能活得更久。",
+      "advice_en": "CLAUDE.md and friends load into every future session, so anything written there outlives the skill. Often legitimate — confirm it is what you wanted.",
+      "advice_zh": "CLAUDE.md 这类文件会载入之后每一次会话，写进去的内容比技能本身活得更久。很多时候是正当操作——确认这是你想要的即可。",
       "flags": "i",
       "id": "SXR026",
       "kind": "pattern",
-      "pattern": "(append|add|write|insert|update|modif\\w+|echo)[^\\n]{0,60}(CLAUDE\\.md|AGENTS?\\.md|GEMINI\\.md|copilot-instructions|\\.cursorrules|MEMORY\\.md)|>>\\s*[^\\n]{0,30}(CLAUDE\\.md|AGENTS?\\.md)",
-      "severity": "HIGH",
+      "pattern": "(append\\w*|add\\w*|writ\\w+|insert\\w*|updat\\w+|modif\\w+|echo)[^\\n]{0,60}(CLAUDE\\.md|AGENTS?\\.md|GEMINI\\.md|copilot-instructions|\\.cursorrules|MEMORY\\.md)|>>\\s*[^\\n]{0,30}(CLAUDE\\.md|AGENTS?\\.md)",
+      "severity": "MEDIUM",
       "target": "any_text",
-      "title_en": "Writes to the agent's persistent memory / instruction files",
-      "title_zh": "写入 Agent 的长期记忆 / 指令文件"
+      "title_en": "Modifies the agent's persistent memory / instruction files",
+      "title_zh": "修改 Agent 的长期记忆 / 指令文件"
     },
     {
       "advice_en": "Repointing the base URL routes every prompt and key through somebody else's server.",

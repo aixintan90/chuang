@@ -207,10 +207,10 @@ RULES = [
          advice_en="Anything a skill wants hidden from you is something you need to see.",
          advice_zh="凡是技能想瞒着你的事，恰恰就是你必须看到的事。"),
     dict(id="SXR004", severity="CRITICAL", kind="builtin", check="unicode-hidden",
-         title_en="Hidden text: zero-width or bidirectional-override characters",
-         title_zh="隐形文本：零宽字符或双向覆盖字符（肉眼不可见的指令通道）",
-         advice_en="Invisible characters can smuggle instructions past human review. Inspect with a hex editor.",
-         advice_zh="不可见字符可以把指令偷运过人工审查。用十六进制查看器检查。"),
+         title_en="Hidden text: bidirectional-override or zero-width characters",
+         title_zh="隐形文本：双向覆盖字符或零宽字符（肉眼不可见的通道）",
+         advice_en="Bidi overrides reorder what you see versus what the model reads. Zero-width runs can smuggle text or break naive scanners. Inspect with a hex editor.",
+         advice_zh="双向覆盖字符会让你看到的顺序与模型读到的不一致；成串的零宽字符可用来夹带内容或绕过简单扫描。用十六进制查看器检查。"),
     dict(id="SXR005", severity="CRITICAL", kind="pattern", target="any_text",
          pattern=r"(>>|tee\s+-a)\s*[\"']?~?/?\.(bashrc|zshrc|profile|bash_profile)|crontab\s+-|schtasks\s+/create|reg\s+add\s+HK|LaunchAgents|systemd.*enable",
          flags="i",
@@ -223,13 +223,16 @@ RULES = [
          title_zh="ASCII 走私：Unicode Tags 区字符（U+E0000–U+E007F）",
          advice_en="This block encodes ordinary ASCII invisibly. It has essentially no legitimate use in a skill — treat as deliberate concealment.",
          advice_zh="这个区段能把普通 ASCII 编码成完全不可见的字符，在技能里几乎没有正当用途——按蓄意隐藏处理。"),
+    # Only the sequences that CONCEAL or ACT. Colour codes are how every TUI
+    # and every doc about terminals is written — matching all of CSI flagged
+    # keybinding docs and an article explaining ANSI, which is noise.
     dict(id="SXR007", severity="CRITICAL", kind="pattern", target="any_text",
-         pattern=r"\x1b\[|\x1b\]|\\x1[bB]\[|\\033\[|\\u001[bB]\[|\\e\[|\\x1[bB]\]|\\033\]",
+         pattern=r"(\x1b|\\x1[bB]|\\033|\\e|\\u001[bB])(\[8m|\]8;;|\]52;)",
          flags="",
-         title_en="ANSI escape sequences (hide text, fake links, write the clipboard)",
-         title_zh="ANSI 转义序列（隐藏文本、伪造链接、写入剪贴板）",
-         advice_en="Terminals act on these: text can be made invisible, a link can point somewhere other than it shows, and OSC 52 writes your clipboard.",
-         advice_zh="终端会真的执行它们：文本可以被隐形、链接可以指向与显示不符的地方、OSC 52 还能写你的剪贴板。"),
+         title_en="ANSI escapes that hide text, fake a link, or write your clipboard",
+         title_zh="用于隐藏文本、伪造链接或写入剪贴板的 ANSI 转义",
+         advice_en="Conceal (CSI 8m), OSC 8 hyperlinks and OSC 52 clipboard writes have no place in a skill's text.",
+         advice_zh="隐藏显示（CSI 8m）、OSC 8 伪链接、OSC 52 写剪贴板——技能正文里不该出现这些。"),
     dict(id="SXR008", severity="CRITICAL", kind="pattern", target="any_text",
          pattern=r"/dev/tcp/[^/\s]+/\d+|(ba|z)?sh\s+-i\s*>&|\bnc(at)?\s+[^\n]{0,40}\s-[a-z]*e\b|socket\.socket\([^\n]*\)[^\n]{0,80}connect\(",
          flags="i",
@@ -237,14 +240,23 @@ RULES = [
          title_zh="反弹 shell / C2 回连",
          advice_en="This hands an outside party an interactive session on your machine. There is no benign version of this in a skill.",
          advice_zh="这等于把你机器上的交互式会话交给外人。技能里不存在这种代码的正当版本。"),
+    # Split deliberately: an OAST/collector domain in a skill is hard to
+    # explain, whereas ngrok is an everyday dev tunnel and canarytokens are a
+    # DEFENSIVE product. Lumping them together inflated this rule three-fold.
     dict(id="SXR009", severity="CRITICAL", kind="pattern", target="any_text",
-         pattern=r"\b(webhook\.site|requestbin\.\w+|pipedream\.net|ngrok(-free)?\.(io|app|dev)|burpcollaborator\.net|oast\.(fun|pro|site|live|online|me)|interact\.sh|dnslog\.cn|canarytokens\.\w+)",
+         pattern=r"\b(webhook\.site|requestbin\.\w+|pipedream\.net|burpcollaborator\.net|oast\.(fun|pro|site|live|online|me)|interact\.sh|dnslog\.cn)",
          flags="i",
          title_en="Contacts a throwaway data-collection endpoint",
          title_zh="连接一次性数据收集端点",
-         advice_en="webhook.site, ngrok tunnels, OAST domains and friends exist to catch data from someone else's machine. A real skill has a real backend.",
-         advice_zh="webhook.site、ngrok 隧道、OAST 域名之类，存在的意义就是接收从别人机器上发来的数据。正经技能会有正经后端。",
-         ),
+         advice_en="webhook.site, OAST and collaborator domains exist to catch data from someone else's machine. A real skill has a real backend.",
+         advice_zh="webhook.site、OAST、collaborator 这类域名，存在的意义就是接收从别人机器上发来的数据。正经技能会有正经后端。"),
+    dict(id="SXR038", severity="MEDIUM", kind="pattern", target="any_text",
+         pattern=r"\b(ngrok(-free)?\.(io|app|dev)|localtunnel\.me|trycloudflare\.com|serveo\.net)",
+         flags="i",
+         title_en="Uses a public tunnel to expose a local service",
+         title_zh="使用公开隧道把本地服务暴露到公网",
+         advice_en="Tunnels are ordinary dev tools, but they also make a local endpoint reachable from anywhere. Check what is being exposed.",
+         advice_zh="隧道是常见的开发工具，但它同时会让本地端口变得全网可达。确认暴露出去的是什么。"),
     # --------------------------------------------------------------- HIGH
     dict(id="SXR010", severity="HIGH", kind="builtin", check="exfil-combo",
          title_en="Reads credential paths AND uploads data in the same skill",
@@ -345,8 +357,10 @@ RULES = [
          title_zh="从非官方源 URL 安装依赖包",
          advice_en="URL installs bypass registry review entirely.",
          advice_zh="从 URL 直装依赖会完全绕过包仓库的审查。"),
+    # The sink must actually EXECUTE. Decoding base64 into json.loads() is
+    # ordinary data handling and made up most of this rule's first-cut hits.
     dict(id="SXR024", severity="HIGH", kind="pattern", target="any_text",
-         pattern=r"(base64\s+(-d|-D|--decode)|base64\.b64decode|atob\(|FromBase64String)[^\n]{0,60}(\||>\s*\S|\)\s*\)|\bexec|\beval|\bsh\b|python|node)",
+         pattern=r"(base64\s+(-d|-D|--decode)|base64\.b64decode|atob\(|FromBase64String)[^\n]{0,80}(\|\s*(sudo\s+)?(ba|z)?sh\b|\|\s*python|\|\s*node|\|\s*iex\b|\bexec\s*\(|\beval\s*\(|subprocess\.|os\.system|Invoke-Expression)|(\|\s*(sudo\s+)?(ba|z)?sh\b|\beval\s*\(|\bexec\s*\()[^\n]{0,80}(base64\s+(-d|-D|--decode)|b64decode)",
          flags="i",
          title_en="Decodes base64 and feeds it to something that executes",
          title_zh="解码 base64 后直接交给执行器",
@@ -359,13 +373,16 @@ RULES = [
          title_zh="伪造的系统/权威标记或对话特殊 token",
          advice_en="A skill dressing its text up as a system message is trying to borrow authority it doesn't have.",
          advice_zh="技能把自己的内容伪装成系统消息，是在冒用它本没有的权限。"),
-    dict(id="SXR026", severity="HIGH", kind="pattern", target="any_text",
-         pattern=r"(append|add|write|insert|update|modif\w+|echo)[^\n]{0,60}(CLAUDE\.md|AGENTS?\.md|GEMINI\.md|copilot-instructions|\.cursorrules|MEMORY\.md)|>>\s*[^\n]{0,30}(CLAUDE\.md|AGENTS?\.md)",
+    # MEDIUM on purpose: plenty of legitimate skills exist precisely to set up
+    # your CLAUDE.md. This is a "know that this is happening" finding, and it
+    # is the concealment rules that turn it into an attack.
+    dict(id="SXR026", severity="MEDIUM", kind="pattern", target="any_text",
+         pattern=r"(append\w*|add\w*|writ\w+|insert\w*|updat\w+|modif\w+|echo)[^\n]{0,60}(CLAUDE\.md|AGENTS?\.md|GEMINI\.md|copilot-instructions|\.cursorrules|MEMORY\.md)|>>\s*[^\n]{0,30}(CLAUDE\.md|AGENTS?\.md)",
          flags="i",
-         title_en="Writes to the agent's persistent memory / instruction files",
-         title_zh="写入 Agent 的长期记忆 / 指令文件",
-         advice_en="CLAUDE.md and friends are loaded into every future session. Anything written there outlives the skill that wrote it.",
-         advice_zh="CLAUDE.md 这类文件会被载入之后的每一次会话——写进去的东西比写它的技能活得更久。"),
+         title_en="Modifies the agent's persistent memory / instruction files",
+         title_zh="修改 Agent 的长期记忆 / 指令文件",
+         advice_en="CLAUDE.md and friends load into every future session, so anything written there outlives the skill. Often legitimate — confirm it is what you wanted.",
+         advice_zh="CLAUDE.md 这类文件会载入之后每一次会话，写进去的内容比技能本身活得更久。很多时候是正当操作——确认这是你想要的即可。"),
     # Only an ASSIGNMENT counts. API reference skills name these variables
     # constantly; what matters is a skill that sets one to a value.
     dict(id="SXR027", severity="HIGH", kind="pattern", target="any_text",
@@ -791,13 +808,37 @@ def run_builtin_rule(rule, skill, all_findings):
 
     elif check == "unicode-hidden":
         for where, text in skill.target_text("any_text"):
-            bad = [(i, ch) for i, ch in enumerate(text)
-                   if ch in ZERO_WIDTH or ch in BIDI]
-            if bad:
-                i, ch = bad[0]
-                out.append(finding(rule, where, line_of(text, i),
-                                   "%d invisible char(s), first U+%04X"
-                                   % (len(bad), ord(ch))))
+            if rule["id"] in skill.ignored.get(where, ()):
+                continue
+            bidi, zw = [], []
+            for i, ch in enumerate(text):
+                if ch in BIDI:
+                    bidi.append((i, ch))
+                elif ch in ZERO_WIDTH:
+                    # U+FEFF at position 0 is a byte-order mark left by an
+                    # editor, and U+200D between pictographs is how emoji
+                    # like 👨‍👩‍👧 are built. Neither is concealment.
+                    if i == 0 and ch == "﻿":
+                        continue
+                    if ch == "‍" and 0 < i < len(text) - 1 and (
+                            ord(text[i - 1]) > 0x2000 and ord(text[i + 1]) > 0x2000):
+                        continue
+                    zw.append((i, ch))
+            if bidi:
+                i, ch = bidi[0]
+                out.append(finding(
+                    rule, where, line_of(text, i),
+                    "%d bidirectional-override char(s), first U+%04X"
+                    % (len(bidi), ord(ch))))
+            elif len(zw) >= 3:
+                # One stray zero-width space is a copy-paste artefact; a run
+                # of them is a channel.
+                i, ch = zw[0]
+                sev = demote(rule["severity"], 2)
+                out.append(finding(
+                    rule, where, line_of(text, i),
+                    "%d zero-width char(s), first U+%04X" % (len(zw), ord(ch)),
+                    sev))
 
     elif check == "exfil-combo":
         ids = {f["rule"] for f in all_findings}

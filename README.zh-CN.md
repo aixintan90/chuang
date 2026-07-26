@@ -12,11 +12,21 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 
-[English](README.md) · [简体中文](README.zh-CN.md) · [**在线安检器 ↗**](https://aixintan90.github.io/skillxray/)
+[English](README.md) · [简体中文](README.zh-CN.md) · [**在线安检器 ↗**](https://aixintan90.github.io/skillxray/) · [**生态报告 ↗**](https://aixintan90.github.io/skillxray/report.html)
 
 </div>
 
 ---
+
+> ### 我们扫描了 45,702 个公开 Agent 技能，一半不干净。
+>
+> 样本覆盖 **577 个公开仓库**：**6.6%** 含高危或严重问题，**0.9%** 含严重问题，
+> **每 129 个就有 1 个**带着难以用正当理由解释的信号——隐藏指令、一次性数据收集
+> 端点、反弹 shell。与此同时，**每 7 个技能就有 1 个预授权了 `Bash`**，装上之后
+> 它的命令可以不再征求你同意就执行。
+>
+> **[→ 阅读完整报告](https://aixintan90.github.io/skillxray/report.html)**
+> ——包括我们在数字有意义之前，必须先修掉的六类误报。
 
 一个 Agent 技能就是一个带 `SKILL.md` 的文件夹——而这个文件里装的，是**别人替
 你的 AI Agent 写好的指令**。你的 Agent 一旦加载它，这些指令就进了上下文；随附的
